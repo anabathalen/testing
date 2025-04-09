@@ -64,7 +64,8 @@ def fit_gaussian_with_retries(drift_time, intensity, n_attempts=10):
 # Function to process each folder and extract data from .txt files
 def process_folder_data(folder_name, base_path):
     folder_path = os.path.join(base_path, folder_name)
-    folder_data = []
+    results = []
+    plots = []
 
     # Iterate through each file in the folder
     for filename in os.listdir(folder_path):
@@ -78,41 +79,36 @@ def process_folder_data(folder_name, base_path):
             # Perform Gaussian fit
             params, r2, fitted_values = fit_gaussian_with_retries(drift_time, intensity)
             if params is not None:
-                file_number = int(filename.split('.')[0])  # Extract charge state number from filename
                 amp, apex, stddev = params
-                # Store results as a row to append to the final dataframe
-                folder_data.append({
-                    'protein': folder_name,
-                    'charge state': file_number,
-                    'drift time': apex,  # Storing Apex Drift Time
-                    'R²': r2
-                })
+                charge_state = filename.split('.')[0]
+                results.append([folder_name, charge_state, apex, r2])  # Include protein (folder_name) and charge state
+                plots.append((drift_time, intensity, fitted_values, filename, apex, r2))
 
-    return folder_data
+    # Convert results to DataFrame
+    results_df = pd.DataFrame(results, columns=['protein', 'charge state', 'drift time', 'r2'])
 
-# Function to display the final results and plots
-def display_results(all_folders_data):
-    st.write("Final Gaussian Fit Results for All Folders:")
+    return results_df, plots
 
-    # Combine all the results into a single DataFrame for easy viewing
-    all_results = []
-    for folder, data in all_folders_data.items():
-        all_results.extend(data)
-
-    results_df = pd.DataFrame(all_results)
+# Function to display the data and plots
+def display_results(results_df, plots):
+    st.write("Combined Gaussian Fit Results:")
     st.dataframe(results_df)
 
-    # Plot all the fits for each charge state in each folder
-    n_plots = len(all_results)
+    # Plot all the fits
+    n_plots = len(plots)
     n_cols = 3
     n_rows = (n_plots + n_cols - 1) // n_cols
 
     plt.figure(figsize=(12, 4 * n_rows))
-    for i, (folder, data) in enumerate(all_folders_data.items()):
-        for charge_state, params in data.items():
-            # For illustration purposes, we just use arbitrary values for plotting
-            st.write(f"Plotting {folder} - Charge State {charge_state}")
-            # Actual plotting code can go here if needed
+    for i, (drift_time, intensity, fitted_values, filename, apex, r2) in enumerate(plots):
+        plt.subplot(n_rows, n_cols, i + 1)
+        plt.plot(drift_time, intensity, 'b.', label='Raw Data', markersize=3)
+        plt.plot(drift_time, fitted_values, 'r-', label='Gaussian Fit', linewidth=1)
+        plt.title(f'{filename}\nApex: {apex:.2f}, R²: {r2:.3f}')
+        plt.xlabel('Drift Time')
+        plt.ylabel('Intensity')
+        plt.legend()
+        plt.grid()
 
     plt.tight_layout()
     st.pyplot(plt)
@@ -126,29 +122,32 @@ def calibrate_page():
         # Step 1: Extract the folders from the ZIP file
         folders, temp_dir = handle_zip_upload(uploaded_zip_file)
 
-        # Step 2: Automatically process all folders
-        all_folders_data = {}
+        # Step 2: Process all folders automatically
+        all_results_df = pd.DataFrame(columns=['protein', 'charge state', 'drift time', 'r2'])
+        all_plots = []
+
+        # Process each folder in the ZIP
         for folder in folders:
             st.write(f"Processing folder: {folder}")
-            folder_data = process_folder_data(folder, temp_dir)
-            all_folders_data[folder] = folder_data
 
-        # Step 3: Display the results and allow download
-        display_results(all_folders_data)
+            # Process the data in the folder
+            results_df, plots = process_folder_data(folder, temp_dir)
 
-        # Option to download all results as CSV
+            # Append to the combined results DataFrame
+            all_results_df = pd.concat([all_results_df, results_df], ignore_index=True)
+
+            # Append plots for visualization
+            all_plots.extend(plots)
+
+        # Display the combined results and plots
+        display_results(all_results_df, all_plots)
+
+        # Option to download the combined results as CSV
         csv_buffer = io.StringIO()
-        all_results = []
-        for folder, data in all_folders_data.items():
-            for charge_state, params in data.items():
-                row = {'Folder': folder, 'Charge State': charge_state, **params}
-                all_results.append(row)
-
-        results_df = pd.DataFrame(all_results)
-        results_df.to_csv(csv_buffer, index=False)
+        all_results_df.to_csv(csv_buffer, index=False)
         st.download_button(
-            label="Download All Gaussian Fit Results (CSV)",
+            label="Download Combined Gaussian Fit Results (CSV)",
             data=csv_buffer.getvalue(),
-            file_name="all_gaussian_fit_results.csv",
+            file_name="combined_gaussian_fit_results.csv",
             mime="text/csv"
         )
