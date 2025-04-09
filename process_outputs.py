@@ -56,8 +56,8 @@ def process_protein_folder(protein_folder, base_path):
 
         # Load output data with header skipping and correct columns using `usecols`
         try:
-            # Skip the first row (title row) and select relevant columns (CCS and CCS stddev)
-            output_data = np.loadtxt(output_files[output_filename], dtype=str, skiprows=2, usecols=(0, 4, 5))
+            # Skip the first few rows and extract only the necessary columns (Drift, CCS, CCS Std Dev)
+            output_data = np.loadtxt(output_files[output_filename], dtype=str, skiprows=4, usecols=(3, 4, 5))
             
             # Sort the output data by index (the first column)
             output_data = output_data[output_data[:, 0].argsort()]
@@ -128,4 +128,3 @@ def analyze_output_dat_files_app():
 # Run the Streamlit app
 if __name__ == "__main__":
     analyze_output_dat_files_app()
-
