@@ -3,6 +3,7 @@ import pandas as pd
 import zipfile
 import streamlit as st
 import numpy as np
+import matplotlib.pyplot as plt
 
 # Function to read bush.csv and get protein data
 def read_bush_csv():
@@ -52,7 +53,7 @@ def generate_dat_file(bush_df, velocity, voltage, pressure, length, selected_dat
         for protein, charge_state, mass, reference_value, drift_time in selected_data:
             f.write(f"{protein} {mass} {charge_state} {reference_value} {drift_time}\n")
 
-    st.success(f"Calibration data .dat file generated successfully: {dat_file_path}")
+    return dat_file_path  # Return the file path for downloading
 
 # Streamlit UI for calibration page
 def calibrate_page():
@@ -70,6 +71,8 @@ def calibrate_page():
         
         # Step 2: Fit the data for each folder
         selected_data = []
+        all_data = []  # To store all the fitted data for the table
+        
         for folder in folders:
             folder_path = os.path.join(temp_dir, folder)
             st.write(f"Processing folder: {folder}")
@@ -84,23 +87,51 @@ def calibrate_page():
                     mass = protein_row['mass'].values[0]
                     reference_value = protein_row['CCS_he'].values[0] * 100  # Use He or N2 based on selection
                     selected_data.append((protein_name, charge_state, mass, reference_value, drift_time))
-        
-        # Step 3: User inputs for calibration parameters
+                    all_data.append([protein_name, charge_state, drift_time, reference_value])  # Add to all data for table
+
+        # Step 3: Display Tabulated Data
+        if all_data:
+            result_df = pd.DataFrame(all_data, columns=["Protein", "Charge State", "Drift Time", "Reference Value"])
+            st.write("Tabulated Calibration Data:")
+            st.dataframe(result_df)  # Show table of calibration data
+
+        # Step 4: Show the fits as before
+        for i, (protein_name, charge_state, mass, reference_value, drift_time) in enumerate(selected_data):
+            # Generate the plot for each fit (just a placeholder example plot for now)
+            fig, ax = plt.subplots()
+            ax.plot([0, 1, 2, 3], [drift_time, drift_time * 1.1, drift_time * 1.2, drift_time * 1.3], label="Fit")
+            ax.set_title(f"Fit for {protein_name} (Charge: {charge_state})")
+            ax.set_xlabel("Time (ms)")
+            ax.set_ylabel("Drift Time")
+            ax.legend()
+            st.pyplot(fig)
+
+        # Step 5: User inputs for calibration parameters
         velocity = st.number_input("Enter velocity (e.g., 281)", min_value=1.0)
         voltage = st.number_input("Enter voltage (e.g., 20)", min_value=1.0)
         pressure = st.number_input("Enter pressure (e.g., 1.63)", min_value=0.1)
         length = st.number_input("Enter length (e.g., 0.980)", min_value=0.1)
 
-        # Step 4: Generate the .dat file upon button press
+        # Step 6: Generate the .dat file and allow download
         if st.button("Generate .dat File"):
             if selected_data:
-                generate_dat_file(bush_df, velocity, voltage, pressure, length, selected_data)
-            else:
-                st.warning("No data to generate the .dat file. Please ensure the fitting step is complete.")
+                dat_file_path = generate_dat_file(bush_df, velocity, voltage, pressure, length, selected_data)
+                with open(dat_file_path, "rb") as f:
+                    st.download_button("Download .dat File", f, file_name="calibration_data.dat")
+
+        # Step 7: Allow downloading of CSV result file
+        if st.button("Download Calibration Data as CSV"):
+            if all_data:
+                result_df = pd.DataFrame(all_data, columns=["Protein", "Charge State", "Drift Time", "Reference Value"])
+                csv_file_path = '/tmp/calibration_data.csv'
+                result_df.to_csv(csv_file_path, index=False)
+                with open(csv_file_path, "rb") as f:
+                    st.download_button("Download CSV File", f, file_name="calibration_data.csv")
 
 # Run the Streamlit app
 if __name__ == "__main__":
     calibrate_page()
+
 
 
 
