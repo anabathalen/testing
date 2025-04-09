@@ -55,9 +55,16 @@ def process_protein_folder(protein_folder, base_path):
         intensity = input_data[:, 2]  # Intensity column (3rd column)
 
         # Load output data
-        output_data = np.loadtxt(output_files[output_filename])
-        ccs = output_data[output_data[:, 0].argsort(), 4]  # CCS values from output
-        ccs_stddev = output_data[output_data[:, 0].argsort(), 5]  # CCS StdDev from output
+        try:
+            output_data = np.loadtxt(output_files[output_filename], dtype=str)  # Force loading as strings to handle non-numeric
+            output_data = output_data[output_data[:, 0].argsort()]  # Ensure data is sorted by index (column 0)
+
+            # Convert the output to numeric values for CCS and CCS stddev, coercing errors to NaN
+            ccs = pd.to_numeric(output_data[:, 4], errors='coerce')
+            ccs_stddev = pd.to_numeric(output_data[:, 5], errors='coerce')
+        except Exception as e:
+            st.warning(f"Error processing output file {output_filename}: {str(e)}")
+            continue
 
         # Ensure the lengths match
         if len(drift_time) != len(ccs):
@@ -118,4 +125,3 @@ def analyze_output_dat_files_app():
 # Run the Streamlit app
 if __name__ == "__main__":
     analyze_output_dat_files_app()
-
