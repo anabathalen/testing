@@ -10,23 +10,17 @@ import io
 
 # Function to handle .zip file upload and extract folder names
 def handle_zip_upload(unique_key):
-    # Allow the user to upload a .zip file with a unique key
     uploaded_file = st.file_uploader("Upload a ZIP file", type="zip", key=unique_key)
     
     if uploaded_file is not None:
         try:
-            # Read the uploaded ZIP file
             with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
-                # List all the file/folder names in the ZIP file
                 zip_contents = zip_ref.namelist()
-                
-                # Filter out only directories (folders) from the list
                 folders = set()
                 for item in zip_contents:
                     if item.endswith('/'):  # Folders end with '/'
                         folders.add(item)
                 
-                # Display the folder names
                 if folders:
                     st.write("Folders in the ZIP file:")
                     for folder in sorted(folders):
@@ -53,7 +47,7 @@ def r_squared(y_true, y_pred):
 
 # Function for fitting Gaussian and retrying with different initial guesses
 def fit_gaussian_with_retries(drift_time, intensity, n_attempts=10):
-    best_r2 = -np.inf  # Start with the worst R²
+    best_r2 = -np.inf
     best_params = None
     best_fitted_values = None
 
@@ -80,7 +74,6 @@ def fit_gaussian_with_retries(drift_time, intensity, n_attempts=10):
 
 # Process the protein files and return results as DataFrame
 def process_protein_files(protein_name, zip_file):
-    # Extract files from the ZIP
     with zipfile.ZipFile(zip_file, 'r') as zip_ref:
         folder_path = f"/tmp/{protein_name}/"
         zip_ref.extractall(folder_path)
@@ -94,12 +87,10 @@ def process_protein_files(protein_name, zip_file):
         if filename.endswith('.txt') and re.match(r'^\d', filename):
             file_path = os.path.join(protein_folder, filename)
 
-            # Load data from the .txt file
             data = np.loadtxt(file_path)
             drift_time = data[:, 0]
             intensity = data[:, 1]
 
-            # Fit Gaussian and collect results
             params, r2, fitted_values = fit_gaussian_with_retries(drift_time, intensity)
             if params is not None:
                 amp, apex, stddev = params
@@ -110,10 +101,9 @@ def process_protein_files(protein_name, zip_file):
 
     results_df = pd.DataFrame(results, columns=['File Number', 'Apex Drift Time', 'R²', 'Amplitude', 'Standard Deviation'])
 
-    st.write("Gaussian Fitting Results:")
-    st.dataframe(results_df)  # Show the results as a table in the app
+    st.write(f"Gaussian Fitting Results for {protein_name}:")
+    st.dataframe(results_df)
 
-    # Plot all fits
     n_plots = len(plots)
     n_cols = 3
     n_rows = (n_plots + n_cols - 1) // n_cols
@@ -138,10 +128,9 @@ def process_protein_files(protein_name, zip_file):
 def calibrate_page():
     st.title("ZIP File Folder Extractor and Gaussian Fitting")
 
-    # Step 1: Upload ZIP file and list folders
-    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip", key="zip_file_uploader")
+    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip", key="zip_file_uploader_1")
     if uploaded_zip_file is not None:
-        folders = handle_zip_upload(unique_key="zip_file_uploader")  # Extract folders from the ZIP file
+        folders = handle_zip_upload(unique_key="zip_file_uploader_1")  # Extract folders from the ZIP file
         if folders:
             protein_name = st.selectbox("Select Protein Folder", options=list(folders))
             if protein_name:
@@ -154,7 +143,8 @@ def calibrate_page():
                 st.download_button(
                     label="Download Gaussian Fit Results (CSV)",
                     data=csv_buffer.getvalue(),
-                    file_name="gaussian_fit_results.csv",
+                    file_name=f"{protein_name}_gaussian_fit_results.csv",
                     mime="text/csv"
                 )
+
 
