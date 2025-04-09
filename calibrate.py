@@ -128,9 +128,13 @@ def process_protein_files(protein_name, zip_file):
 def calibrate_page():
     st.title("ZIP File Folder Extractor and Gaussian Fitting")
 
-    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip", key="zip_file_uploader_1")
+    # Generate a unique key for each file uploader to prevent duplicate key error
+    unique_key = "zip_file_uploader_" + str(st.session_state.get('file_uploader_count', 0))
+    st.session_state['file_uploader_count'] = st.session_state.get('file_uploader_count', 0) + 1
+
+    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip", key=unique_key)
     if uploaded_zip_file is not None:
-        folders = handle_zip_upload(unique_key="zip_file_uploader_1")  # Extract folders from the ZIP file
+        folders = handle_zip_upload(unique_key=unique_key)  # Extract folders from the ZIP file
         if folders:
             protein_name = st.selectbox("Select Protein Folder", options=list(folders))
             if protein_name:
@@ -146,5 +150,4 @@ def calibrate_page():
                     file_name=f"{protein_name}_gaussian_fit_results.csv",
                     mime="text/csv"
                 )
-
 
