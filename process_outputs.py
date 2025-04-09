@@ -54,11 +54,15 @@ def process_protein_folder(protein_folder, base_path):
         drift_time = input_data[:, 3]  # Drift time column (4th column)
         intensity = input_data[:, 2]  # Intensity column (3rd column)
 
-        # Load output data with header skipping and correct columns using `usecols`
+        # Load output data, skipping non-data rows and using the correct columns
         try:
-            # Skip the first few rows and extract only the necessary columns (Drift, CCS, CCS Std Dev)
+            # Skip rows until the data starts (skip headers, empty rows, or comments)
             output_data = np.loadtxt(output_files[output_filename], dtype=str, skiprows=4, usecols=(3, 4, 5))
             
+            # Check if the output file has data
+            if output_data.ndim == 1:  # Single column case
+                output_data = np.reshape(output_data, (-1, 3))  # Reshape to avoid dimension errors
+
             # Sort the output data by index (the first column)
             output_data = output_data[output_data[:, 0].argsort()]
 
