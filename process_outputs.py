@@ -1,115 +1,121 @@
 import os
 import io
 import zipfile
+import numpy as np
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 
-def extract_zip(uploaded_file):
-    extract_dir = "/tmp/extracted_outputs"
-    if os.path.exists(extract_dir):
-        for root, dirs, files in os.walk(extract_dir, topdown=False):
-            for name in files:
-                os.remove(os.path.join(root, name))
-            for name in dirs:
-                os.rmdir(os.path.join(root, name))
-    os.makedirs(extract_dir, exist_ok=True)
+# Function to handle ZIP file upload and extract folder names
+def handle_zip_upload(uploaded_file):
+    temp_dir = '/tmp/protein_data/'
+    os.makedirs(temp_dir, exist_ok=True)
 
     with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
-        zip_ref.extractall(extract_dir)
+        zip_ref.extractall(temp_dir)
 
-    folders = [f for f in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, f))]
-    return extract_dir, folders
+    # Filter out system folders like __MACOSX and only keep real folders
+    protein_folders = [
+        f for f in os.listdir(temp_dir)
+        if os.path.isdir(os.path.join(temp_dir, f)) and not f.startswith("__")
+    ]
+    if not protein_folders:
+        st.error("No valid protein folders found in the ZIP file.")
+    return protein_folders, temp_dir
 
-def parse_output_dat(filepath):
-    with open(filepath, 'r') as f:
-        lines = f.readlines()
-
-    try:
-        cal_data_index = lines.index('[CALIBRATED DATA]\n') + 1
-    except ValueError:
+# Function to process each protein folder and extract data from input and output files
+def process_protein_folder(protein_folder, base_path):
+    protein_path = os.path.join(base_path, protein_folder)
+    
+    input_files = {}
+    output_files = {}
+    
+    # Search for input and output .dat files
+    for filename in os.listdir(protein_path):
+        if filename.startswith('input_') and filename.endswith('.dat'):
+            input_files[filename] = os.path.join(protein_path, filename)
+        elif filename.startswith('output_') and filename.endswith('.dat'):
+            output_files[filename] = os.path.join(protein_path, filename)
+    
+    # Skip if no input or output files are found for this protein
+    if not input_files or not output_files:
         return pd.DataFrame()
 
-    # Read header
-    headers = lines[cal_data_index].strip().split(',')
-    data_lines = lines[cal_data_index + 1:]
-    data = [line.strip().split(',') for line in data_lines if line.strip()]
-    df = pd.DataFrame(data, columns=headers)
-    df = df.apply(pd.to_numeric, errors='ignore')
-    return df
+    # Process the data from both input and output files
+    protein_data = []
 
-def read_input_dat(filepath):
-    return pd.read_csv(filepath, sep=' ', header=None, names=['index', 'mass', 'intensity', 'drift_time'])
+    for input_filename, input_file_path in input_files.items():
+        output_filename = f"output_{input_filename[6:]}"  # Match corresponding output file
+        if output_filename not in output_files:
+            continue  # Skip if no matching output file for this input
+        
+        # Load input data
+        input_data = np.loadtxt(input_file_path)
+        drift_time = input_data[:, 3]  # Drift time column (4th column)
+        intensity = input_data[:, 2]  # Intensity column (3rd column)
 
-def merge_data(input_df, output_df):
-    return pd.merge(input_df, output_df[['ID', 'CCS', 'CCS Std.Dev.']], left_on='index', right_on='ID')
+        # Load output data
+        output_data = np.loadtxt(output_files[output_filename])
+        ccs = output_data[output_data[:, 0].argsort(), 4]  # CCS values from output
+        ccs_stddev = output_data[output_data[:, 0].argsort(), 5]  # CCS StdDev from output
 
-def process_protein_folder(folder_path, folder_name):
-    results = []
+        # Ensure the lengths match
+        if len(drift_time) != len(ccs):
+            st.warning(f"Warning: Drift time and CCS lengths mismatch in {protein_folder}/{input_filename}")
+            continue
+        
+        # Combine input and output data
+        for i in range(len(drift_time)):
+            protein_data.append([protein_folder, int(input_filename[6:-4]), drift_time[i], intensity[i], ccs[i], ccs_stddev[i]])
 
-    dat_files = [f for f in os.listdir(folder_path) if f.startswith("input_") and f.endswith(".dat")]
-    if not dat_files:
-        return pd.DataFrame()  # Skip folders with no input files
+    # Convert to DataFrame
+    protein_df = pd.DataFrame(protein_data, columns=['protein', 'charge_state', 'drift_time', 'intensity', 'ccs', 'ccs_stddev'])
+    
+    return protein_df
 
-    for file in dat_files:
-        charge_state = file.split("_")[1].split(".")[0]
-        input_path = os.path.join(folder_path, file)
-        output_path = os.path.join(folder_path, f"output_{charge_state}.dat")
+# Function to combine results into a single CSV
+def combine_results(protein_folders_data):
+    combined_df = pd.concat(protein_folders_data, ignore_index=True)
+    return combined_df
 
-        if not os.path.exists(output_path):
-            continue  # Skip if there's no matching output file
-
-        input_df = read_input_dat(input_path)
-        output_df = parse_output_dat(output_path)
-
-        if output_df.empty:
-            continue  # Skip malformed or empty output files
-
-        merged = pd.merge(input_df, output_df, left_on='index', right_on='ID', how='inner')
-        if merged.empty:
-            continue  # No matching rows, skip this pair
-
-        merged['protein'] = folder_name
-        merged['charge state'] = charge_state
-        results.append(merged[['protein', 'charge state', 'drift_time', 'intensity', 'CCS', 'CCS Std.Dev.']])
-
-    if results:
-        return pd.concat(results, ignore_index=True)
-    return pd.DataFrame()  # Return empty if nothing useful was processed
-
-
-    if results:
-        return pd.concat(results, ignore_index=True)
-    return pd.DataFrame()
-
+# Main Streamlit app function
 def analyze_output_dat_files_app():
-    st.title("Combine Input/Output .dat Data into Summary CSV")
+    st.title("Analyze Protein Data - Combine Input and Output")
 
-    uploaded_zip = st.file_uploader("Upload ZIP file with input/output .dat files", type="zip")
-    if uploaded_zip:
-        base_path, protein_folders = extract_zip(uploaded_zip)
-        all_results = []
+    # Step 1: Upload ZIP file
+    uploaded_zip_file = st.file_uploader("Upload ZIP containing protein folders", type="zip")
 
-        for folder in protein_folders:
-            st.write(f"Processing {folder}...")
-            folder_path = os.path.join(base_path, folder)
-            result = process_protein_folder(folder_path, folder)
-            if not result.empty:
-                all_results.append(result)
+    if uploaded_zip_file is not None:
+        protein_folders, base_path = handle_zip_upload(uploaded_zip_file)
 
-        if all_results:
-            final_df = pd.concat(all_results, ignore_index=True)
-            st.dataframe(final_df)
+        all_protein_data = []
+        for protein_folder in protein_folders:
+            st.write(f"Processing protein folder: {protein_folder}")
+            protein_data = process_protein_folder(protein_folder, base_path)
+            
+            # Skip empty dataframes (i.e., no valid data)
+            if not protein_data.empty:
+                all_protein_data.append(protein_data)
 
-            csv = final_df.to_csv(index=False)
+        # Combine all results into a single dataframe
+        if all_protein_data:
+            combined_df = combine_results(all_protein_data)
+            st.write("Combined Data:")
+            st.dataframe(combined_df)
+
+            # Allow user to download the combined data as a CSV file
+            csv_buffer = io.StringIO()
+            combined_df.to_csv(csv_buffer, index=False)
             st.download_button(
                 label="Download Combined CSV",
-                data=csv,
+                data=csv_buffer.getvalue(),
                 file_name="combined_protein_data.csv",
                 mime="text/csv"
             )
         else:
-            st.warning("No valid data extracted from uploaded files.")
+            st.error("No valid data extracted from uploaded files.")
 
-# To run this function in your app
+# Run the Streamlit app
 if __name__ == "__main__":
     analyze_output_dat_files_app()
+
