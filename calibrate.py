@@ -64,7 +64,7 @@ def fit_gaussian_with_retries(drift_time, intensity, n_attempts=10):
 # Function to process each folder and extract data from .txt files
 def process_folder_data(folder_name, base_path):
     folder_path = os.path.join(base_path, folder_name)
-    folder_data = {}
+    folder_data = []
 
     # Iterate through each file in the folder
     for filename in os.listdir(folder_path):
@@ -80,31 +80,29 @@ def process_folder_data(folder_name, base_path):
             if params is not None:
                 file_number = int(filename.split('.')[0])  # Extract charge state number from filename
                 amp, apex, stddev = params
-                # Store Apex Drift Time and other parameters in the dictionary
-                folder_data[file_number] = {
-                    'Apex Drift Time': apex,
-                    'R²': r2,
-                    'Amplitude': amp,
-                    'Standard Deviation': stddev
-                }
+                # Store results as a row to append to the final dataframe
+                folder_data.append({
+                    'protein': folder_name,
+                    'charge state': file_number,
+                    'drift time': apex,  # Storing Apex Drift Time
+                    'R²': r2
+                })
 
     return folder_data
 
-# Function to display all results and plots
+# Function to display the final results and plots
 def display_results(all_folders_data):
-    st.write("All Folders' Gaussian Fit Results:")
+    st.write("Final Gaussian Fit Results for All Folders:")
 
     # Combine all the results into a single DataFrame for easy viewing
     all_results = []
     for folder, data in all_folders_data.items():
-        for charge_state, params in data.items():
-            row = {'Folder': folder, 'Charge State': charge_state, **params}
-            all_results.append(row)
+        all_results.extend(data)
 
     results_df = pd.DataFrame(all_results)
     st.dataframe(results_df)
 
-    # Plot all the fits
+    # Plot all the fits for each charge state in each folder
     n_plots = len(all_results)
     n_cols = 3
     n_rows = (n_plots + n_cols - 1) // n_cols
@@ -113,7 +111,6 @@ def display_results(all_folders_data):
     for i, (folder, data) in enumerate(all_folders_data.items()):
         for charge_state, params in data.items():
             # For illustration purposes, we just use arbitrary values for plotting
-            # You would retrieve drift time, intensity, and fitted values from previous steps
             st.write(f"Plotting {folder} - Charge State {charge_state}")
             # Actual plotting code can go here if needed
 
