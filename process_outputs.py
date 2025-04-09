@@ -1,120 +1,83 @@
-import os
-import zipfile
-import numpy as np
 import pandas as pd
-import streamlit as st
-from pathlib import Path
-from tempfile import TemporaryDirectory
+import os
 
-def handle_zip_upload(uploaded_file):
-    temp_dir = '/tmp/samples_extracted/'
-    os.makedirs(temp_dir, exist_ok=True)
+def read_input_file(input_filename):
+    """Read and return data from the input_X.txt file."""
+    data = pd.read_csv(input_filename, sep=' ', header=None, names=['Index', 'Mass', 'Z', 'DriftTime'])
+    return data
 
-    with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
-        zip_ref.extractall(temp_dir)
+def read_output_file(output_filename):
+    """Read and extract the calibrated data section from output_X.txt."""
+    with open(output_filename, 'r') as file:
+        lines = file.readlines()
 
-    folders = [f for f in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, f))]
-    if not folders:
-        st.error("No folders found in the ZIP file.")
-    return folders, temp_dir
+    # Find the starting line of the 'DIAGNOSTICS' and 'CALIBRATED DATA' sections
+    start_index_diagnostics = lines.index('[DIAGNOSTICS]\n') + 2  # Skip header lines
+    start_index_calibrated = lines.index('[CALIBRATED DATA]\n') + 2  # Skip header lines
+    diagnostics_data = []
+    calibrated_data = []
 
-def process_protein_folder(protein_folder, base_path):
-    output_files = {}
-    protein_output_folder = os.path.join(base_path, protein_folder)
+    # Extract Diagnostics Data (Protein Information)
+    for line in lines[start_index_diagnostics:start_index_calibrated-2]:
+        fields = line.strip().split(',')
+        diagnostics_data.append(fields)
 
-    # Skip if folder doesn't have any relevant files
-    if not any(f.endswith('.dat') for f in os.listdir(protein_output_folder)):
-        st.warning(f"No valid output .dat files found in folder: {protein_folder}")
-        return None
+    # Extract Calibrated Data
+    for line in lines[start_index_calibrated:]:
+        if line.startswith('['):  # Stop when another section begins
+            break
+        fields = line.strip().split(',')
+        calibrated_data.append(fields)
 
-    # Read all the relevant .dat files in the folder
-    for filename in os.listdir(protein_output_folder):
-        if filename.endswith('.dat') and 'output' in filename:
-            file_path = os.path.join(protein_output_folder, filename)
-            try:
-                # Try reading file, ignoring first row (PARAMETERS, DIAGNOSTICS sections)
-                data = pd.read_csv(file_path, delimiter=',', skiprows=17, header=None)
-
-                # Check if the number of columns matches expectations
-                if data.shape[1] != 6:  # Expecting 6 columns (ID, Mass, Z, Drift, CCS, CCS Std.Dev.)
-                    st.error(f"Error: unexpected number of columns in file: {filename}")
-                    continue
-
-                # Store the dataframe for further processing
-                output_files[filename] = data
-            except Exception as e:
-                st.error(f"Error processing output file {filename}: {e}")
-
-    return output_files
-
-def merge_data(drift_file, output_data):
-    # Read drift time and intensity from input file
-    drift_data = pd.read_csv(drift_file, sep=' ', header=None, names=["index", "mass", "intensity", "drift_time"])
+    # Create DataFrames from the extracted data
+    diagnostics_df = pd.DataFrame(diagnostics_data, columns=['ID', 'Mass', 'Charge', 'Mobility', 'Alpha', 'Gamma', 'Model_Vel', 'Exp_Vel', 'Error'])
+    calibrated_df = pd.DataFrame(calibrated_data, columns=['ID', 'Mass', 'Charge', 'DriftTime', 'CCS', 'CCS_StdDev'])
     
-    # Merge the drift data with the output data on the drift time column (using index as a join key)
-    merged_data = pd.merge(drift_data, output_data, how="left", on="index")
-
-    # Extract relevant columns to return
-    merged_data = merged_data[["protein", "charge_state", "drift_time", "intensity"]]
-    return merged_data
-
-def generate_output_zip(final_dataframes):
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w") as zipf:
-        for sample_name, final_df in final_dataframes.items():
-            # Save each dataframe as a .csv file in the zip
-            sample_file_path = f"{sample_name}_merged.csv"
-            final_df.to_csv(sample_file_path, index=False)
-            zipf.writestr(sample_file_path, final_df.to_csv(index=False))
+    # Merge the diagnostics and calibrated data on 'ID'
+    merged_output_df = pd.merge(calibrated_df, diagnostics_df[['ID', 'Mass', 'Charge']], on='ID', how='left')
     
-    return zip_buffer
+    return merged_output_df
 
-# Main Streamlit app
-def analyze_output_dat_files_app():
-    st.title("Analyze Output .dat Files")
+def merge_data(input_df, output_df):
+    """Merge the input data with the output calibrated data on Drift Time and Mass."""
+    merged_df = pd.merge(input_df, output_df, on='DriftTime', how='left')
 
-    uploaded_zip_file = st.file_uploader("Upload ZIP containing protein output folders", type="zip")
-    
-    if uploaded_zip_file is not None:
-        protein_folders, base_path = handle_zip_upload(uploaded_zip_file)
+    # Handle cases with multiple drift times or masses by dropping duplicates
+    merged_df = merged_df.drop_duplicates(subset=['Mass', 'DriftTime'])
 
-        all_final_dataframes = {}
+    return merged_df
 
-        for protein_folder in protein_folders:
-            st.subheader(f"Processing folder: {protein_folder}")
-            
-            output_files = process_protein_folder(protein_folder, base_path)
-            if output_files is not None:
-                for output_filename, output_data in output_files.items():
-                    # Get the charge state from the filename (e.g., input_12.dat -> 12)
-                    charge_state = int(output_filename.split('_')[1].split('.')[0])
-                    
-                    # Construct the input filename dynamically based on the charge state
-                    drift_file = os.path.join(base_path, protein_folder, f"input_{charge_state}.dat")
+def process_data(input_filename, output_filename):
+    """Read the input and output files, merge them, and return the result."""
+    input_df = read_input_file(input_filename)
+    output_df = read_output_file(output_filename)
 
-                    # Check if the drift file exists for this charge state
-                    if os.path.exists(drift_file):
-                        # Merge the data
-                        final_data = merge_data(drift_file, output_data)
-                        all_final_dataframes[protein_folder] = final_data
-                    else:
-                        st.error(f"Drift file for charge state {charge_state} not found: {drift_file}")
+    # Merge input data with output data based on DriftTime
+    merged_df = merge_data(input_df, output_df)
 
-        # If we have processed data, allow for downloading
-        if all_final_dataframes:
-            zip_buffer = generate_output_zip(all_final_dataframes)
+    return merged_df
 
-            st.success("Data merged successfully!")
+def combine_all_files(input_filenames, output_filenames, output_csv_path):
+    """Process and combine data from multiple input/output files into a single CSV."""
+    combined_df = pd.DataFrame()
 
-            st.download_button(
-                label="Download Merged Data (ZIP)",
-                data=zip_buffer.getvalue(),
-                file_name="merged_data.zip",
-                mime="application/zip"
-            )
+    # Loop over each pair of input and output files
+    for input_filename, output_filename in zip(input_filenames, output_filenames):
+        # Process each file
+        merged_data = process_data(input_filename, output_filename)
+        
+        # Append the result to the combined dataframe
+        combined_df = pd.concat([combined_df, merged_data], ignore_index=True)
 
-# Run the Streamlit app
-if __name__ == "__main__":
-    analyze_output_dat_files_app()
+    # Save the combined data to a CSV file
+    combined_df.to_csv(output_csv_path, index=False)
+    print(f"Saved combined data to {output_csv_path}")
 
+# Example usage
+input_filenames = ['input_5.txt', 'input_6.txt']  # List of input files (adjust as needed)
+output_filenames = ['output_5.txt', 'output_6.txt']  # List of corresponding output files
+output_csv_path = 'combined_output.csv'  # Path to save the combined CSV
+
+# Combine all data and save to a CSV
+combine_all_files(input_filenames, output_filenames, output_csv_path)
 
