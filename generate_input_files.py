@@ -47,7 +47,7 @@ def process_sample_folder(folder_name, folder_path, mass, drift_mode, inject_tim
                 "drift_time": drift_time
             })
 
-            dat_filename = f"{os.path.splitext(filename)[0]}.dat"
+            dat_filename = f"input_{os.path.splitext(filename)[0]}.dat"
             dat_path = os.path.join(output_folder, dat_filename)
             df.to_csv(dat_path, sep=' ', index=False, header=False)
     
