@@ -33,7 +33,7 @@ def process_protein_folder(protein_folder, base_path):
             file_path = os.path.join(protein_output_folder, filename)
             try:
                 # Try reading file, ignoring first row (PARAMETERS, DIAGNOSTICS sections)
-                data = pd.read_csv(file_path, delimiter=',', skiprows=3, header=None)
+                data = pd.read_csv(file_path, delimiter=',', skiprows=17, header=None)
 
                 # Check if the number of columns matches expectations
                 if data.shape[1] != 6:  # Expecting 6 columns (ID, Mass, Z, Drift, CCS, CCS Std.Dev.)
