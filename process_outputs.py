@@ -86,12 +86,19 @@ def analyze_output_dat_files_app():
             output_files = process_protein_folder(protein_folder, base_path)
             if output_files is not None:
                 for output_filename, output_data in output_files.items():
-                    # Here we process each file, assuming the drift files are available
-                    drift_file = os.path.join(base_path, protein_folder, "input_charge.dat")
+                    # Get the charge state from the filename (e.g., input_12.dat -> 12)
+                    charge_state = int(output_filename.split('_')[1].split('.')[0])
+                    
+                    # Construct the input filename dynamically based on the charge state
+                    drift_file = os.path.join(base_path, protein_folder, f"input_{charge_state}.dat")
 
-                    # Merge the data
-                    final_data = merge_data(drift_file, output_data)
-                    all_final_dataframes[protein_folder] = final_data
+                    # Check if the drift file exists for this charge state
+                    if os.path.exists(drift_file):
+                        # Merge the data
+                        final_data = merge_data(drift_file, output_data)
+                        all_final_dataframes[protein_folder] = final_data
+                    else:
+                        st.error(f"Drift file for charge state {charge_state} not found: {drift_file}")
 
         # If we have processed data, allow for downloading
         if all_final_dataframes:
@@ -109,4 +116,5 @@ def analyze_output_dat_files_app():
 # Run the Streamlit app
 if __name__ == "__main__":
     analyze_output_dat_files_app()
+
 
