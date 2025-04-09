@@ -1,28 +1,33 @@
-import streamlit as st
-import zipfile
 import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import io
+import streamlit as st
 
 # Function to handle ZIP file upload and extract folder names
 def handle_zip_upload(uploaded_file):
-    # Create a temporary directory to extract ZIP contents
     temp_dir = '/tmp/extracted_zip/'
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Extract the ZIP file contents
     with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
         zip_ref.extractall(temp_dir)
 
-    # List folders in the extracted ZIP content
     folders = [f for f in os.listdir(temp_dir) if os.path.isdir(os.path.join(temp_dir, f))]
-    
     if not folders:
         st.error("No folders found in the ZIP file.")
     return folders, temp_dir
+
+# Read the bush.csv file from the same folder as calibrant.py
+def read_bush_csv():
+    calibrant_file_path = os.path.join(os.path.dirname(__file__), 'bush.csv')
+    if os.path.exists(calibrant_file_path):
+        bush_df = pd.read_csv(calibrant_file_path)
+    else:
+        st.error(f"'{calibrant_file_path}' not found. Make sure 'bush.csv' is in the same directory as the script.")
+        bush_df = pd.DataFrame()  # Empty DataFrame if the file isn't found
+    return bush_df
 
 # Gaussian fit function
 def gaussian(x, amp, mean, stddev):
@@ -62,10 +67,13 @@ def fit_gaussian_with_retries(drift_time, intensity, n_attempts=10):
     return best_params, best_r2, best_fitted_values
 
 # Function to process each folder and extract data from .txt files
-def process_folder_data(folder_name, base_path):
+def process_folder_data(folder_name, base_path, bush_df, calibrant_type):
     folder_path = os.path.join(base_path, folder_name)
     results = []
     plots = []
+
+    # Determine the column for the selected calibrant type
+    calibrant_column = 'CCS_he' if calibrant_type == 'He' else 'CCS_n2'
 
     # Iterate through each file in the folder
     for filename in os.listdir(folder_path):
@@ -81,11 +89,14 @@ def process_folder_data(folder_name, base_path):
             if params is not None:
                 amp, apex, stddev = params
                 charge_state = filename.split('.')[0]
-                results.append([folder_name, charge_state, apex, r2])  # Include protein (folder_name) and charge state
+                # Look up the calibrant data from bush.csv based on protein and charge state
+                calibrant_row = bush_df[(bush_df['protein'] == folder_name) & (bush_df['charge'] == int(charge_state))]
+                calibrant_value = calibrant_row[calibrant_column].values[0] if not calibrant_row.empty else None
+                results.append([folder_name, charge_state, apex, r2, calibrant_value])
                 plots.append((drift_time, intensity, fitted_values, filename, apex, r2))
 
     # Convert results to DataFrame
-    results_df = pd.DataFrame(results, columns=['protein', 'charge state', 'drift time', 'r2'])
+    results_df = pd.DataFrame(results, columns=['protein', 'charge state', 'drift time', 'r2', 'calibrant_value'])
 
     return results_df, plots
 
@@ -115,23 +126,30 @@ def display_results(results_df, plots):
 
 # Main function for the Streamlit page
 def calibrate_page():
-    st.title("ZIP File Folder Extractor and Gaussian Fitting")
+    st.title("ZIP File Folder Extractor and Gaussian Fitting with Calibrant Data")
 
+    # Step 1: Upload ZIP file
     uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip")
     if uploaded_zip_file is not None:
-        # Step 1: Extract the folders from the ZIP file
+        # Extract the folders from the ZIP file
         folders, temp_dir = handle_zip_upload(uploaded_zip_file)
 
-        # Step 2: Process all folders automatically
-        all_results_df = pd.DataFrame(columns=['protein', 'charge state', 'drift time', 'r2'])
+        # Step 2: Read bush.csv for calibrant data
+        bush_df = read_bush_csv()
+
+        # Step 3: Dropdown for selecting calibrant type (He or N2)
+        calibrant_type = st.selectbox("Select Calibrant Type", options=["He", "N2"])
+
+        # Step 4: Process all folders and files
+        all_results_df = pd.DataFrame(columns=['protein', 'charge state', 'drift time', 'r2', 'calibrant_value'])
         all_plots = []
 
-        # Process each folder in the ZIP
+        # Process each folder
         for folder in folders:
             st.write(f"Processing folder: {folder}")
 
             # Process the data in the folder
-            results_df, plots = process_folder_data(folder, temp_dir)
+            results_df, plots = process_folder_data(folder, temp_dir, bush_df, calibrant_type)
 
             # Append to the combined results DataFrame
             all_results_df = pd.concat([all_results_df, results_df], ignore_index=True)
