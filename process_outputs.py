@@ -46,24 +46,36 @@ def merge_data(input_df, output_df):
 def process_protein_folder(folder_path, folder_name):
     results = []
 
-    for file in os.listdir(folder_path):
-        if file.startswith("input_") and file.endswith(".dat"):
-            charge_state = file.split("_")[1].split(".")[0]
-            input_path = os.path.join(folder_path, file)
-            output_path = os.path.join(folder_path, f"output_{charge_state}.dat")
+    dat_files = [f for f in os.listdir(folder_path) if f.startswith("input_") and f.endswith(".dat")]
+    if not dat_files:
+        return pd.DataFrame()  # Skip folders with no input files
 
-            if not os.path.exists(output_path):
-                continue
+    for file in dat_files:
+        charge_state = file.split("_")[1].split(".")[0]
+        input_path = os.path.join(folder_path, file)
+        output_path = os.path.join(folder_path, f"output_{charge_state}.dat")
 
-            input_df = read_input_dat(input_path)
-            output_df = parse_output_dat(output_path)
-            if output_df.empty:
-                continue
+        if not os.path.exists(output_path):
+            continue  # Skip if there's no matching output file
 
-            merged = pd.merge(input_df, output_df, left_on='index', right_on='ID', how='inner')
-            merged['protein'] = folder_name
-            merged['charge state'] = charge_state
-            results.append(merged[['protein', 'charge state', 'drift_time', 'intensity', 'CCS', 'CCS Std.Dev.']])
+        input_df = read_input_dat(input_path)
+        output_df = parse_output_dat(output_path)
+
+        if output_df.empty:
+            continue  # Skip malformed or empty output files
+
+        merged = pd.merge(input_df, output_df, left_on='index', right_on='ID', how='inner')
+        if merged.empty:
+            continue  # No matching rows, skip this pair
+
+        merged['protein'] = folder_name
+        merged['charge state'] = charge_state
+        results.append(merged[['protein', 'charge state', 'drift_time', 'intensity', 'CCS', 'CCS Std.Dev.']])
+
+    if results:
+        return pd.concat(results, ignore_index=True)
+    return pd.DataFrame()  # Return empty if nothing useful was processed
+
 
     if results:
         return pd.concat(results, ignore_index=True)
