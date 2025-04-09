@@ -31,4 +31,5 @@ elif page == "Calibrate":
 
 # Generate Input Files Page
 elif page == "Generate Input Files":
+    st.title("Get Input Files")
     generate_input_dat_files_app()
