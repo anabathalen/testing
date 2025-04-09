@@ -3,10 +3,11 @@ import streamlit as st
 from gaussian_fitting import upload_and_plot
 from calibrate import calibrate_page
 from generate_input_files import generate_input_dat_files_app
+from process_outputs import analyze_output_dat_files_app
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files"])
+page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs"])
 
 # Check if the page has changed, to ensure no redundant loading
 if "page" not in st.session_state or st.session_state["page"] != page:
@@ -33,3 +34,6 @@ elif page == "Calibrate":
 elif page == "Generate Input Files":
     st.title("Get Input Files")
     generate_input_dat_files_app()
+
+elif page == "Process Outputs":
+    analyze_output_dat_files_app()
