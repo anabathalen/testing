@@ -1,6 +1,6 @@
 # app.py
 import streamlit as st
-from gaussian_fitting import upload_and_fit_gaussians
+from gaussian_fitting import upload_and_plot
 from calibrate import calibrate_page
 
 # Sidebar for navigation
@@ -22,7 +22,7 @@ if page == "Home":
 # Fit Gaussians to Data Page
 elif page == "Fit Gaussians to Data":
     st.title("Fit Gaussians to Data")
-    upload_and_fit_gaussians()
+    upload_and_plot()
 
 # Calibrate Page
 elif page == "Calibrate":
