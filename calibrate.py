@@ -9,9 +9,9 @@ from scipy.optimize import curve_fit
 import io
 
 # Function to handle .zip file upload and extract folder names
-def handle_zip_upload():
-    # Allow the user to upload a .zip file
-    uploaded_file = st.file_uploader("Upload a ZIP file", type="zip")
+def handle_zip_upload(unique_key):
+    # Allow the user to upload a .zip file with a unique key
+    uploaded_file = st.file_uploader("Upload a ZIP file", type="zip", key=unique_key)
     
     if uploaded_file is not None:
         try:
@@ -139,9 +139,9 @@ def calibrate_page():
     st.title("ZIP File Folder Extractor and Gaussian Fitting")
 
     # Step 1: Upload ZIP file and list folders
-    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip")
+    uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip", key="zip_file_uploader")
     if uploaded_zip_file is not None:
-        folders = handle_zip_upload()  # Extract folders from the ZIP file
+        folders = handle_zip_upload(unique_key="zip_file_uploader")  # Extract folders from the ZIP file
         if folders:
             protein_name = st.selectbox("Select Protein Folder", options=list(folders))
             if protein_name:
@@ -157,7 +157,4 @@ def calibrate_page():
                     file_name="gaussian_fit_results.csv",
                     mime="text/csv"
                 )
-
-
-    handle_zip_upload()  # Call the function to handle ZIP upload and extract folder names
 
