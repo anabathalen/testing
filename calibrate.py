@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.optimize import curve_fit
 import io
+import zipfile  # <-- Added this import
 import streamlit as st
 
 # Function to handle ZIP file upload and extract folder names
@@ -169,3 +170,4 @@ def calibrate_page():
             file_name="combined_gaussian_fit_results.csv",
             mime="text/csv"
         )
+
