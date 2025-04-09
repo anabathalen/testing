@@ -9,6 +9,15 @@ from tempfile import TemporaryDirectory
 
 def handle_zip_upload(uploaded_file):
     temp_dir = '/tmp/samples_extracted/'
+    
+    # 🚨 Clear old files
+    if os.path.exists(temp_dir):
+        for root, dirs, files in os.walk(temp_dir, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+
     os.makedirs(temp_dir, exist_ok=True)
 
     with zipfile.ZipFile(uploaded_file, 'r') as zip_ref:
@@ -18,6 +27,7 @@ def handle_zip_upload(uploaded_file):
     if not folders:
         st.error("No folders found in the ZIP file.")
     return folders, temp_dir
+
 
 def process_sample_folder(folder_name, folder_path, mass, drift_mode, inject_time=None):
     sample_output = io.BytesIO()
