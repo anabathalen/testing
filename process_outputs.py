@@ -54,14 +54,17 @@ def process_protein_folder(protein_folder, base_path):
         drift_time = input_data[:, 3]  # Drift time column (4th column)
         intensity = input_data[:, 2]  # Intensity column (3rd column)
 
-        # Load output data
+        # Load output data with header skipping and correct columns using `usecols`
         try:
-            output_data = np.loadtxt(output_files[output_filename], dtype=str)  # Force loading as strings to handle non-numeric
-            output_data = output_data[output_data[:, 0].argsort()]  # Ensure data is sorted by index (column 0)
+            # Skip the first row (title row) and select relevant columns (CCS and CCS stddev)
+            output_data = np.loadtxt(output_files[output_filename], dtype=str, skiprows=2, usecols=(0, 4, 5))
+            
+            # Sort the output data by index (the first column)
+            output_data = output_data[output_data[:, 0].argsort()]
 
-            # Convert the output to numeric values for CCS and CCS stddev, coercing errors to NaN
-            ccs = pd.to_numeric(output_data[:, 4], errors='coerce')
-            ccs_stddev = pd.to_numeric(output_data[:, 5], errors='coerce')
+            # Convert the CCS and CCS stddev columns to numeric
+            ccs = pd.to_numeric(output_data[:, 1], errors='coerce')
+            ccs_stddev = pd.to_numeric(output_data[:, 2], errors='coerce')
         except Exception as e:
             st.warning(f"Error processing output file {output_filename}: {str(e)}")
             continue
@@ -125,3 +128,4 @@ def analyze_output_dat_files_app():
 # Run the Streamlit app
 if __name__ == "__main__":
     analyze_output_dat_files_app()
+
