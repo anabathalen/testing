@@ -125,6 +125,20 @@ def display_results(results_df, plots):
     plt.tight_layout()
     st.pyplot(plt)
 
+# Function to create .dat file from results
+def generate_dat_file(results_df, velocity, voltage, pressure, length):
+    dat_content = f"# length {length}\n# velocity {velocity}\n# voltage {voltage}\n# pressure {pressure}\n"
+
+    # Create .dat content
+    for _, row in results_df.iterrows():
+        protein = row['protein']
+        charge_state = row['charge state']
+        mass = row['calibrant_value'] if not pd.isna(row['calibrant_value']) else 0  # Handle missing calibrant value
+        drift_time = row['drift time']
+        dat_content += f"{protein}_{charge_state} {mass} {charge_state} {drift_time} {drift_time}\n"
+    
+    return dat_content
+
 # Main function for the Streamlit page
 def calibrate_page():
     st.title("ZIP File Folder Extractor and Gaussian Fitting with Calibrant Data")
@@ -141,7 +155,13 @@ def calibrate_page():
         # Step 3: Dropdown for selecting calibrant type (He or N2)
         calibrant_type = st.selectbox("Select Calibrant Type", options=["He", "N2"])
 
-        # Step 4: Process all folders and files
+        # Step 4: Get user inputs for parameters
+        velocity = st.number_input("Enter velocity", min_value=0.0, value=281.0)
+        voltage = st.number_input("Enter voltage", min_value=0.0, value=20.0)
+        pressure = st.number_input("Enter pressure", min_value=0.0, value=1.63)
+        length = st.number_input("Enter length", min_value=0.0, value=0.980)
+
+        # Step 5: Process all folders and files
         all_results_df = pd.DataFrame(columns=['protein', 'charge state', 'drift time', 'r2', 'calibrant_value'])
         all_plots = []
 
@@ -171,3 +191,11 @@ def calibrate_page():
             mime="text/csv"
         )
 
+        # Generate .dat file and allow download
+        dat_file_content = generate_dat_file(all_results_df, velocity, voltage, pressure, length)
+        st.download_button(
+            label="Download .dat File",
+            data=dat_file_content,
+            file_name="calibration_data.dat",
+            mime="text/plain"
+        )
