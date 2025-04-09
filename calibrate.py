@@ -6,6 +6,7 @@ import numpy as np
 
 # Function to read bush.csv and get protein data
 def read_bush_csv():
+    # Assuming bush.csv is located in the same directory as the script
     calibrant_file_path = os.path.join(os.path.dirname(__file__), 'bush.csv')
     if os.path.exists(calibrant_file_path):
         bush_df = pd.read_csv(calibrant_file_path)
@@ -29,7 +30,7 @@ def handle_zip_upload(uploaded_file):
 # Function to fit the data (for now we are just simulating)
 def fit_data_for_folder(folder_path):
     # Placeholder fitting function, replace with your actual fitting process
-    # For now, return simulated drift time and charge state
+    # For now, return simulated drift time and charge states
     return np.random.rand(10), np.random.randint(10, 30, size=10)  # Simulated drift time and charge states
 
 # Function to generate the .dat file
@@ -60,6 +61,9 @@ def calibrate_page():
     # Step 1: Upload ZIP file with data
     uploaded_zip_file = st.file_uploader("Upload a ZIP file containing data", type="zip")
     
+    # Read bush.csv at the beginning to avoid the NameError
+    bush_df = read_bush_csv()
+
     if uploaded_zip_file:
         folders, temp_dir = handle_zip_upload(uploaded_zip_file)
         st.write(f"Found the following folders in the ZIP file: {folders}")
@@ -97,5 +101,6 @@ def calibrate_page():
 # Run the Streamlit app
 if __name__ == "__main__":
     calibrate_page()
+
 
 
