@@ -5,17 +5,6 @@ import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Function to read bush.csv and get protein data
-def read_bush_csv():
-    # Assuming bush.csv is located in the same directory as the script
-    calibrant_file_path = os.path.join(os.path.dirname(__file__), 'bush.csv')
-    if os.path.exists(calibrant_file_path):
-        bush_df = pd.read_csv(calibrant_file_path)
-    else:
-        st.error(f"'{calibrant_file_path}' not found. Make sure 'bush.csv' is in the same directory as the script.")
-        bush_df = pd.DataFrame()  # Empty DataFrame if the file isn't found
-    return bush_df
-
 # Function to handle ZIP file upload and extract folders
 def handle_zip_upload(uploaded_file):
     temp_dir = '/tmp/extracted_zip/'
@@ -34,7 +23,7 @@ def fit_data_for_folder(folder_path):
     # For now, return simulated drift time and charge states
     return np.random.rand(10), np.random.randint(10, 30, size=10)  # Simulated drift time and charge states
 
-# Function to generate the .dat file
+# Function to generate the .dat file (calibration data)
 def generate_dat_file(bush_df, velocity, voltage, pressure, length, selected_data):
     # Choose the correct column based on user input for calibrant type
     calibrant_type = st.selectbox("Select Calibrant Type", options=["He", "N2"])
@@ -54,6 +43,17 @@ def generate_dat_file(bush_df, velocity, voltage, pressure, length, selected_dat
             f.write(f"{protein} {mass} {charge_state} {reference_value} {drift_time}\n")
 
     return dat_file_path  # Return the file path for downloading
+
+# Function to read bush.csv and get protein data
+def read_bush_csv():
+    # Assuming bush.csv is located in the same directory as the script
+    calibrant_file_path = os.path.join(os.path.dirname(__file__), 'bush.csv')
+    if os.path.exists(calibrant_file_path):
+        bush_df = pd.read_csv(calibrant_file_path)
+    else:
+        st.error(f"'{calibrant_file_path}' not found. Make sure 'bush.csv' is in the same directory as the script.")
+        bush_df = pd.DataFrame()  # Empty DataFrame if the file isn't found
+    return bush_df
 
 # Streamlit UI for calibration page
 def calibrate_page():
@@ -131,7 +131,6 @@ def calibrate_page():
 # Run the Streamlit app
 if __name__ == "__main__":
     calibrate_page()
-
 
 
 
