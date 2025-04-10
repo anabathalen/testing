@@ -3,8 +3,6 @@ import streamlit as st
 from gaussian_fitting import upload_and_plot
 from calibrate import calibrate_page
 from generate_input_files import generate_input_dat_files_app
-from process_outputs import analyze_output_dat_files_app
-
 # Sidebar for navigation
 st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs"])
