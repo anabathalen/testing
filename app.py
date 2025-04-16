@@ -18,7 +18,7 @@ st.session_state["page"] = page
 if page == "Home":
     st.title("👩🏻‍🔬 Barran Group IM-MS Processing Tools")
     st.subheader("← Navigate to the tool you need from the sidebar.")
-    st.markdown('''This is a work in progress, so there are a few things to note:  
+    st.markdown('''**This** is a work in progress, so there are a few things to note:  
     1. I haven't validated this - sanity check your results, don't trust the outputs for important things.  
     2. If the site is down it is because I'm working on it, either find a previous version on my github or just ask me and I'll sort it!  
     3. I encourage you to make improvements to this - please make a new branch and do your thing, then open a pull request and I will likely accept.  
@@ -27,6 +27,8 @@ if page == "Home":
 # Fit Gaussians to Data Page
 elif page == "Fit Gaussians to Data":
     st.title("Fit Gaussians to Data")
+    st.subheader("Takes x, y data and helps you fit gaussians and plot a pretty graph.")
+    st.markdown('''This is a super simple tool - upload your ATD/CCSD as a csv file with headings 'x' and 'y' for drift time / CCS and intensity respectively. When you do this, you'll see your data visualised with starting guesses at the peak maxima. Input the number of gaussians you see and their approximate positions. The script uses the data +/- 5% of the inputted peak position to fit gaussians to each peak. This will work well if you have relatively well-resolved peaks - if you don't, then this is not the tool for you. The purpose of this method is to avoid overfitting small features.''')
     upload_and_plot()
 
 # Calibrate Page
