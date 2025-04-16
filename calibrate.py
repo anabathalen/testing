@@ -142,7 +142,6 @@ def generate_dat_file(results_df, velocity, voltage, pressure, length):
     return dat_content
 
 def calibrate_page():
-    st.title("Calibrate with IMSCal")
 
     # Step 1: Upload ZIP file
     uploaded_zip_file = st.file_uploader("Upload a ZIP file", type="zip")
