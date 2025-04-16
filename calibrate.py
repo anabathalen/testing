@@ -141,7 +141,6 @@ def generate_dat_file(results_df, velocity, voltage, pressure, length):
     
     return dat_content
 
-# Main function for the Streamlit page
 def calibrate_page():
     st.title("Calibrate with IMSCal")
 
@@ -163,27 +162,26 @@ def calibrate_page():
         pressure = st.number_input("Enter pressure", min_value=0.0, value=1.63)
         length = st.number_input("Enter length", min_value=0.0, value=0.980)
 
+        # Step 4.5: Ask for data type
+        data_type = st.radio("Is your data Cyclic or Synapt?", options=["Cyclic", "Synapt"])
+        inject_time = 0.0
+        if data_type.lower() == "cyclic":
+            inject_time = st.number_input("Enter inject time (ms)", min_value=0.0, value=0.0)
+
         # Step 5: Process all folders and files
-        all_results_df = pd.DataFrame(columns=['protein', 'charge state', 'drift time', 'r2', 'calibrant_value'])
+        all_results_df = pd.DataFrame(columns=['protein', 'mass', 'charge state', 'drift time', 'r2', 'calibrant_value'])
         all_plots = []
 
-        # Process each folder
         for folder in folders:
             st.write(f"Processing folder: {folder}")
-
-            # Process the data in the folder
             results_df, plots = process_folder_data(folder, temp_dir, bush_df, calibrant_type)
-
-            # Append to the combined results DataFrame
             all_results_df = pd.concat([all_results_df, results_df], ignore_index=True)
-
-            # Append plots for visualization
             all_plots.extend(plots)
 
-        # Display the combined results and plots
+        # Step 6: Display results
         display_results(all_results_df, all_plots)
 
-        # Option to download the combined results as CSV
+        # Step 7: CSV download
         csv_buffer = io.StringIO()
         all_results_df.to_csv(csv_buffer, index=False)
         st.download_button(
@@ -193,11 +191,19 @@ def calibrate_page():
             mime="text/csv"
         )
 
-            dat_file_content = generate_dat_file(adjusted_df, velocity, voltage, pressure, length)
-            st.download_button(
-                label="Download .dat File",
-                data=dat_file_content,
-                file_name="calibration_data.dat",
-                mime="text/plain"
-            )
+        # Step 8: Prepare adjusted drift times for .dat file if cyclic
+        if data_type.lower() == "cyclic":
+            adjusted_df = all_results_df.copy()
+            adjusted_df['drift time'] = adjusted_df['drift time'] - inject_time
+        else:
+            adjusted_df = all_results_df
+
+        # Step 9: .dat file download
+        dat_file_content = generate_dat_file(adjusted_df, velocity, voltage, pressure, length)
+        st.download_button(
+            label="Download .dat File",
+            data=dat_file_content,
+            file_name="calibration_data.dat",
+            mime="text/plain"
+        )
 
