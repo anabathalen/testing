@@ -193,6 +193,18 @@ def calibrate_page():
             mime="text/csv"
         )
 
+                # Ask the user for the data type
+        data_type = st.radio("Is your data cyclic or synapt?", options=["cyclic", "synapt"])
+
+        inject_time = 0.0
+        if data_type == "cyclic":
+            inject_time = st.number_input("Enter inject time (to subtract from drift time)", min_value=0.0, value=0.0)
+
+        # Apply inject time subtraction if needed
+        if data_type == "cyclic":
+            all_results_df['drift time'] = all_results_df['drift time'] - inject_time
+
+
         # Generate .dat file and allow download
         dat_file_content = generate_dat_file(all_results_df, velocity, voltage, pressure, length)
         st.download_button(
