@@ -53,6 +53,7 @@ def process_sample_folder(folder_name, folder_path, mass, drift_mode, inject_tim
             df = pd.DataFrame({
                 "index": index,
                 "mass": mass,
+                "charge": filename[:-4],
                 "intensity": intensity,
                 "drift_time": drift_time
             })
@@ -86,7 +87,7 @@ def generate_input_dat_files_app():
         drift_mode = st.radio("What type of data is this?", options=["Cyclic", "Synaptic"])
         inject_time = None
         if drift_mode == "Cyclic":
-            inject_time = st.number_input("Enter inject time to subtract (ms)", min_value=0.0, value=0.0)
+            inject_time = st.number_input("Enter inject time to subtract (ms)", min_value=0.0, value=12.0)
 
         all_sample_paths = []
 
