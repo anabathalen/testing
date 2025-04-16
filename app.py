@@ -21,7 +21,7 @@ if page == "Home":
     st.markdown('''This is a work in progress, so there are a few things to note:  
     1. I haven't validated this - sanity check your results, don't trust the outputs for important things.  
     2. If the site is down it is because I'm working on it, either find a previous version on my github or just ask me and I'll sort it!  
-    3. I encourage you to make improvements to this - please make a new branch and do your thing, then open a pull request and I will likely accept.
+    3. I encourage you to make improvements to this - please make a new branch and do your thing, then open a pull request and I will likely accept.  
     Other than that, I hope you enjoy. Let me know if you need any help (ana.bathalen@manchester.ac.uk or slack)!''')
 
 # Fit Gaussians to Data Page
