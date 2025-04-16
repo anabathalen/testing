@@ -33,6 +33,9 @@ elif page == "Fit Gaussians to Data":
 
 # Calibrate Page
 elif page == "Calibrate":
+    st.title("Calibrate (with IMSCal)")
+    st.subheader("Takes ATDs of Calibrants and Returns IMSCal Reference File AND a CSV for the Old Method.")
+    st.markdown('''For now this tool doesn't allow you to bypass the tedious MassLynx stuff - in future it will use TWIMExtract. To use this tool, make a folder for each calibrant titled the name of the calibrant (see Bush Database for calibrant names). In each folder, paste the ATD for each charge state in turn into a text file called x.txt where x is the charge state. Zip these folders and upload it here.''')
     calibrate_page()
 
 # Generate Input Files Page
