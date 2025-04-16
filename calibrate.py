@@ -93,7 +93,7 @@ def process_folder_data(folder_name, base_path, bush_df, calibrant_type):
                 # Look up the calibrant data from bush.csv based on protein and charge state
                 calibrant_row = bush_df[(bush_df['protein'] == folder_name) & (bush_df['charge'] == int(charge_state))]
                 calibrant_value = calibrant_row[calibrant_column].values[0] if not calibrant_row.empty else None
-                mass_value = float(calibrant_row['mass'])
+                mass = float(calibrant_row['mass'])
                 results.append([folder_name, mass, charge_state, apex, r2, calibrant_value])
                 plots.append((drift_time, intensity, fitted_values, filename, apex, r2))
 
