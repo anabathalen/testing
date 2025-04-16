@@ -91,13 +91,13 @@ def process_folder_data(folder_name, base_path, bush_df, calibrant_type):
                 amp, apex, stddev = params
                 charge_state = filename.split('.')[0]
                 # Look up the calibrant data from bush.csv based on protein and charge state
-                calibrant_row = bush_df[(bush_df['protein'] == folder_name) & (bush_df['charge'] == int(charge_state))]
+                calibrant_row = bush_df[(bush_df['protein'] == folder_name) & (bush_df['charge'] == int(charge_state)) & (bush_df['mass'] == float(mass))]
                 calibrant_value = calibrant_row[calibrant_column].values[0] if not calibrant_row.empty else None
-                results.append([folder_name, charge_state, apex, r2, calibrant_value])
+                results.append([folder_name, mass, charge_state, apex, r2, calibrant_value])
                 plots.append((drift_time, intensity, fitted_values, filename, apex, r2))
 
     # Convert results to DataFrame
-    results_df = pd.DataFrame(results, columns=['protein', 'charge state', 'drift time', 'r2', 'calibrant_value'])
+    results_df = pd.DataFrame(results, columns=['protein', 'mass', 'charge state', 'drift time', 'r2', 'calibrant_value'])
 
     return results_df, plots
 
@@ -133,7 +133,8 @@ def generate_dat_file(results_df, velocity, voltage, pressure, length):
     for _, row in results_df.iterrows():
         protein = row['protein']
         charge_state = row['charge state']
-        mass = row['calibrant_value'] if not pd.isna(row['calibrant_value']) else 0  # Handle missing calibrant value
+        mass = 
+        mass = row['calibrant_value']*100 if not pd.isna(row['calibrant_value']) else 0  # Handle missing calibrant value
         drift_time = row['drift time']
         dat_content += f"{protein}_{charge_state} {mass} {charge_state} {drift_time} {drift_time}\n"
     
