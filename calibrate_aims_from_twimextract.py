@@ -13,19 +13,25 @@ def twim_extract_page():
     calibration_file = st.file_uploader("Upload the calibration CSV file", type="csv")
     
     if twim_extract_file and calibration_file:
-        # Read the first row of the TWIM extract to check if it contains hashtags
+        # Read the first row to check for metadata
         first_row = twim_extract_file.readline().decode("utf-8")
-
-        # Check if the first row contains a hashtag, indicating metadata
+        
+        # Reset file pointer so pandas reads from the start again
+        twim_extract_file.seek(0)
+        
+        # Conditional loading depending on metadata
         if first_row.startswith("#"):
-            # Skip the first two rows (metadata rows)
             twim_df = pd.read_csv(twim_extract_file, header=2)
         else:
-            # Proceed as normal if no hashtags are found
             twim_df = pd.read_csv(twim_extract_file)
+        
+        # Convert 'Drift Time' column to numeric, coercing errors
+        twim_df.iloc[:, 0] = pd.to_numeric(twim_df.iloc[:, 0], errors='coerce')
+        twim_df = twim_df.dropna(subset=[twim_df.columns[0]])  # Remove rows with NaN drift times
+        
+        # Rename columns: first one is 'Drift Time', the rest are assumed to be CV steps
+        twim_df.columns = ['Drift Time'] + list(twim_df.columns[1:])
 
-        # Set column names based on the first line of data after skipping (if applicable)
-        twim_df.columns = ["Drift Time"] + [str(i) for i in range(1, len(twim_df.columns))]
         st.write("Uploaded TWIM Extract Data:")
         st.dataframe(twim_df.head())
 
