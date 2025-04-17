@@ -1,4 +1,41 @@
-        # Button to process data
+import streamlit as st
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from io import BytesIO
+
+def twim_extract_page():
+    st.title("TWIM CCS Calibration and CIU Heatmap Generator")
+
+    # Upload files
+    twim_extract_file = st.file_uploader("Upload the TWIM Extract CSV file", type="csv")
+    calibration_file = st.file_uploader("Upload the calibration CSV file", type="csv")
+    
+    if twim_extract_file and calibration_file:
+        # Read TWIM extract data
+        twim_df = pd.read_csv(twim_extract_file, header=None)
+        twim_df.columns = ["Drift Time"] + [str(i) for i in range(1, len(twim_df.columns))]
+        st.write("Uploaded TWIM Extract Data:")
+        st.dataframe(twim_df.head())
+
+        # Read calibration data
+        cal_df = pd.read_csv(calibration_file)
+        st.write("Uploaded Calibration Data:")
+        st.dataframe(cal_df.head())
+
+        if 'Z' not in cal_df.columns:
+            st.error("Calibration data must include a 'Z' column for charge state.")
+            return
+
+        data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
+        charge_state = st.number_input("Enter the charge state of the protein (Z)", min_value=1, max_value=10, step=1)
+        inject_time = None
+
+        if data_type == "Cyclic":
+            inject_time = st.number_input("Enter the injection time (ms)", min_value=0.0, value=0.0, step=0.1)
+
+                # Button to process data
         if st.button("Process Data"):
             if inject_time is not None and data_type == "Cyclic":
                 twim_df["Drift Time"] = twim_df["Drift Time"] - inject_time
@@ -116,3 +153,7 @@
         fig.savefig(buf, format="png", dpi=dpi)
         st.download_button("Download Heatmap PNG", data=buf.getvalue(), file_name="ciu_heatmap.png", mime="image/png")
 
+
+# Run the app
+if __name__ == "__main__":
+    twim_extract_page()
