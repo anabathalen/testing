@@ -22,7 +22,7 @@ def twim_extract_page():
         # Read calibration data
         cal_df = pd.read_csv(calibration_file)
         st.write("Uploaded Calibration Data:")
-        st.dataframe(cal_df.head())  # Fix: Change to `cal_df`, not `calibrated_df`
+        st.dataframe(cal_df.head())
 
         if 'Z' not in cal_df.columns:
             st.error("Calibration data must include a 'Z' column for charge state.")
@@ -54,6 +54,7 @@ def twim_extract_page():
             cal_data["Drift (ms)"] = cal_data["Drift"] * 1000
 
             calibrated_data = []
+
             drift_times = twim_df["Drift Time"]
             collision_voltages = twim_df.columns[1:]
 
@@ -69,20 +70,15 @@ def twim_extract_page():
                     cv = collision_voltages[col_idx]
                     calibrated_data.append([ccs_value, drift_time, float(cv), intensity])
 
-            calibrated_df = pd.DataFrame(calibrated_data, columns=["CCS", "Drift Time", "Collision Voltage", "Intensity"])
-            calibrated_df["Collision Voltage"] = pd.to_numeric(calibrated_df["Collision Voltage"], errors='coerce')
-            calibrated_df["CCS"] = pd.to_numeric(calibrated_df["CCS"], errors='coerce')
-            calibrated_df = calibrated_df.sort_values(by=["Collision Voltage", "CCS"])
+            # Convert calibrated data to NumPy array
+            calibrated_array = np.array(calibrated_data)
 
             # Store the result in session state
-            st.session_state["calibrated_df"] = calibrated_df
+            st.session_state["calibrated_array"] = calibrated_array
 
     # If processed data exists, allow customization and visualization
-    if "calibrated_df" in st.session_state:
-        calibrated_df = st.session_state["calibrated_df"]
-
-        st.write("Calibrated Data:")
-        st.dataframe(calibrated_df.head())
+    if "calibrated_array" in st.session_state:
+        calibrated_array = st.session_state["calibrated_array"]
 
         # Customization section
         st.header("📊 CIU Heatmap Customization")
@@ -93,56 +89,45 @@ def twim_extract_page():
         dpi = st.slider("Figure Resolution (DPI)", 100, 1000, 300, 50)
 
         x_min, x_max = st.slider("Crop Collision Voltage Range",
-            float(calibrated_df["Collision Voltage"].min()),
-            float(calibrated_df["Collision Voltage"].max()),
-            (float(calibrated_df["Collision Voltage"].min()), float(calibrated_df["Collision Voltage"].max()))
+            float(calibrated_array[:, 2].min()),
+            float(calibrated_array[:, 2].max()),
+            (float(calibrated_array[:, 2].min()), float(calibrated_array[:, 2].max()))
         )
         y_min, y_max = st.slider("Crop CCS Range",
-            float(calibrated_df["CCS"].min()),
-            float(calibrated_df["CCS"].max()),
-            (float(calibrated_df["CCS"].min()), float(calibrated_df["CCS"].max()))
+            float(calibrated_array[:, 0].min()),
+            float(calibrated_array[:, 0].max()),
+            (float(calibrated_array[:, 0].min()), float(calibrated_array[:, 0].max()))
         )
 
-        # Prepare pivot table
-        heatmap_data = calibrated_df.pivot_table(
-            index="CCS",
-            columns="Collision Voltage",
-            values="Intensity",
-            aggfunc="mean"
+        # Create heatmap grid with CCS and Collision Voltage as axes
+        grid_x = np.linspace(x_min, x_max, num=100)
+        grid_y = np.linspace(y_min, y_max, num=100)
+
+        # Create a meshgrid for the x and y axes
+        X, Y = np.meshgrid(grid_x, grid_y)
+
+        # Interpolate intensities over the meshgrid
+        from scipy.interpolate import griddata
+        Z = griddata(
+            (calibrated_array[:, 2], calibrated_array[:, 0]),  # Points
+            calibrated_array[:, 3],  # Intensity
+            (X, Y),  # Grid
+            method='cubic'  # Interpolation method
         )
 
-        # Crop heatmap data based on user-selected ranges
-        heatmap_data = heatmap_data.loc[
-            (heatmap_data.index >= y_min) & (heatmap_data.index <= y_max),
-            (heatmap_data.columns >= x_min) & (heatmap_data.columns <= x_max)
-        ]
-
+        # Plot the heatmap
         fig, ax = plt.subplots(figsize=(figure_size, figure_size), dpi=dpi)
+        c = ax.pcolormesh(X, Y, Z, cmap=color_map, shading='auto')
 
-        # Generate the heatmap
-        sns.heatmap(
-            heatmap_data.sort_index(ascending=False),  # Sort index to get CCS in descending order
-            cmap=color_map,
-            ax=ax,
-            cbar=False,  # Remove the color bar
-            xticklabels=True,
-            yticklabels=True,
-            linewidths=0.5,  # Optional: add some line widths for better separation
-            linecolor='white'  # Optional: set the line color between blocks for separation
-        )
-
-        # Set axis labels and adjust tick marks
+        # Customize the plot with labels and ticks
         ax.set_xlabel("Collision Voltage", fontsize=font_size)
         ax.set_ylabel("CCS", fontsize=font_size)
         ax.tick_params(labelsize=font_size)
 
-        # Adjust axes to have sensible tick marks (rounded to nearest 100 or 200)
-        ax.set_xticks(np.linspace(x_min, x_max, num=10))  # 10 ticks along x-axis
-        ax.set_xticklabels(np.round(np.linspace(x_min, x_max, num=10), 0))  # Round values
-        ax.set_yticks(np.linspace(y_min, y_max, num=10))  # 10 ticks along y-axis
-        ax.set_yticklabels(np.round(np.linspace(y_min, y_max, num=10), 0))  # Round values
+        # Add color bar
+        fig.colorbar(c, ax=ax)
 
-        # User input for x-value labeling (0-5)
+        # Add dashed lines based on user input for x-values and y-values
         num_x_labels = st.slider("How many x-values to label (0-5)?", 0, 5, 0)
         x_values = []
         x_labels = []
@@ -152,7 +137,6 @@ def twim_extract_page():
             x_values.append(value)
             x_labels.append(label)
 
-        # User input for y-value labeling (0-5)
         num_y_labels = st.slider("How many y-values to label (0-5)?", 0, 5, 0)
         y_values = []
         y_labels = []
@@ -162,22 +146,20 @@ def twim_extract_page():
             y_values.append(value)
             y_labels.append(label)
 
-        # Plot the dashed lines and add labels based on user input
+        # Plot the dashed lines and labels based on user input
         for i in range(num_x_labels):
-            x_pos = np.argmin(np.abs(np.array(heatmap_data.columns) - x_values[i]))  # Find nearest x value
-            ax.axvline(x=x_pos, color='white', linestyle='--', linewidth=1)
-            ax.text(x=x_pos, y=heatmap_data.index[0], s=x_labels[i], color='white', va='bottom', ha='center', fontsize=font_size)
+            ax.axvline(x=x_values[i], color='white', linestyle='--', linewidth=1)
+            ax.text(x=x_values[i], y=y_max, s=x_labels[i], color='white', va='bottom', ha='center', fontsize=font_size)
 
         for i in range(num_y_labels):
-            y_pos = np.argmin(np.abs(np.array(heatmap_data.index) - y_values[i]))  # Find nearest y value
-            ax.axhline(y=y_pos, color='white', linestyle='--', linewidth=1)
-            ax.text(x=heatmap_data.columns[0], y=y_pos, s=y_labels[i], color='white', va='center', ha='left', fontsize=font_size)
+            ax.axhline(y=y_values[i], color='white', linestyle='--', linewidth=1)
+            ax.text(x=x_min, y=y_values[i], s=y_labels[i], color='white', va='center', ha='left', fontsize=font_size)
 
         plt.tight_layout()
         st.pyplot(fig)
 
         # Download buttons
-        csv = calibrated_df.to_csv(index=False).encode('utf-8')
+        csv = pd.DataFrame(calibrated_array, columns=["CCS", "Drift Time", "Collision Voltage", "Intensity"]).to_csv(index=False).encode('utf-8')
         st.download_button("Download Calibrated CSV", data=csv, file_name="calibrated_twim_extract.csv", mime="text/csv")
         img = BytesIO()
         fig.savefig(img, format='png', bbox_inches="tight")
