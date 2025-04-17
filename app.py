@@ -4,10 +4,12 @@ from gaussian_fitting import upload_and_plot
 from calibrate import calibrate_page
 from generate_input_files import generate_input_dat_files_app
 from process_outputs import process_outputs_page
+from calibrate_drift_files import calibrate_drift_files_page
+
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs"])
+page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files"])
 
 # Check if the page has changed, to ensure no redundant loading
 if "page" not in st.session_state or st.session_state["page"] != page:
@@ -48,5 +50,9 @@ elif page == "Generate Input Files":
 # Process Outputs Page
 elif page == "Process Outputs":
     st.title("Process Output Files")
+
+elif page == "Calibrate Drift Files":
+    calibrate_drift_files_page()
+
     process_outputs_page()
 
