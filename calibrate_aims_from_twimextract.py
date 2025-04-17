@@ -28,7 +28,7 @@ def twim_extract_page():
         # Ask for the data type (Synapt or Cyclic)
         data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
         
-        # Ask for the charge state
+        # Ask for the charge state (Z)
         charge_state = st.number_input("Enter the charge state of the protein (Z)", min_value=1, max_value=10, step=1)
 
         # If the data is Cyclic, ask for the injection time
@@ -42,8 +42,8 @@ def twim_extract_page():
             if inject_time is not None and data_type == "Cyclic":
                 twim_df[0] = twim_df[0] - inject_time  # Subtract the injection time from the drift time
 
-            # Extract calibration data for the given charge state
-            cal_data = cal_df[cal_df["Charge"] == charge_state]
+            # Extract calibration data for the given charge state (Z)
+            cal_data = cal_df[cal_df["Z"] == charge_state]
 
             if cal_data.empty:
                 st.error(f"No calibration data found for charge state {charge_state}")
@@ -57,9 +57,14 @@ def twim_extract_page():
             # Now, calibrate the TWIM extract data
             calibrated_data = []
 
-            for idx, row in twim_df.iterrows():
-                drift_time = row[0]
-                intensities = row[1:].values  # All columns after the first one are intensities
+            # The first column of the TWIM extract file contains drift time
+            drift_times = twim_df[0]
+
+            # The remaining columns represent the intensity at various collision energies
+            collision_voltages = twim_df.columns[1:]  # Starting from the second column (column indices 1 to N)
+
+            for idx, drift_time in enumerate(drift_times):
+                intensities = twim_df.iloc[idx, 1:].values  # All columns after the first one are intensities
                 
                 # Find the closest drift time in the calibration data
                 closest_drift_idx = (cal_data["Drift"] - drift_time).abs().idxmin()
@@ -67,7 +72,7 @@ def twim_extract_page():
                 
                 # Store the calibrated data
                 for col_idx, intensity in enumerate(intensities):
-                    collision_voltage = twim_df.columns[col_idx + 1]  # The collision voltage is in the column header
+                    collision_voltage = collision_voltages[col_idx]  # The collision voltage is in the column header
                     calibrated_data.append([ccs_value, drift_time, collision_voltage, intensity])
 
             # Create a DataFrame from the calibrated data
@@ -85,4 +90,3 @@ def twim_extract_page():
                 file_name="calibrated_twim_extract.csv",
                 mime="text/csv"
             )
-
