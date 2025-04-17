@@ -1,107 +1,58 @@
+# app.py
 import streamlit as st
-import zipfile
-import tempfile
-import os
-import pandas as pd
-from io import BytesIO
+from gaussian_fitting import upload_and_plot
+from calibrate import calibrate_page
+from generate_input_files import generate_input_dat_files_app
+from process_outputs import process_outputs_page
+from calibrate_drift_files import calibrate_drift_files_page
 
-def calibrate_drift_files_page():
-    drift_zip = st.file_uploader("Upload zipped folder of raw drift files", type="zip")
 
-    data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
-    inject_time = None
-    if data_type == "Cyclic":
-        inject_time = st.number_input("Enter the injection time (ms)", min_value=0.0, value=0.0, step=0.1)
+# Sidebar for navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files"])
 
-    cal_csvs = st.file_uploader("Upload the CSV files from the 'Process Output Files' page", type="csv", accept_multiple_files=True)
+# Check if the page has changed, to ensure no redundant loading
+if "page" not in st.session_state or st.session_state["page"] != page:
+    st.session_state.clear()  # Clear session state for fresh start
 
-    if drift_zip and cal_csvs:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Extract raw drift files
-            drift_zip_path = os.path.join(tmpdir, "drift.zip")
-            with open(drift_zip_path, "wb") as f:
-                f.write(drift_zip.getvalue())
+# Store the current page in session state
+st.session_state["page"] = page
 
-            with zipfile.ZipFile(drift_zip_path, 'r') as zip_ref:
-                zip_ref.extractall(tmpdir)
+# Home Page
+if page == "Home":
+    st.title("👩🏻‍🔬 Barran Group IM-MS Processing Tools")
+    st.subheader("← Navigate to the tool you need from the sidebar.")
+    st.markdown('''**This** is a work in progress, so there are a few things to note:  
+    1. I haven't validated this - sanity check your results, don't trust the outputs for important things.  
+    2. If the site is down it is because I'm working on it, either find a previous version on my github or just ask me and I'll sort it!  
+    3. I encourage you to make improvements to this - please make a new branch and do your thing, then open a pull request and I will likely accept.  
+    Other than that, I hope you enjoy. Let me know if you need any help (ana.bathalen@manchester.ac.uk or slack)!''')
 
-            # Load all calibration data into dictionary
-            calibration_lookup = {}
-            for file in cal_csvs:
-                protein_name = file.name.replace(".csv", "")
-                df = pd.read_csv(file)
-                for _, row in df.iterrows():
-                    key = (protein_name, int(row["Z"]))
-                    if key not in calibration_lookup:
-                        calibration_lookup[key] = []
-                    calibration_lookup[key].append({
-                        "Drift": row["Drift"],
-                        "CCS": row["CCS"],
-                        "CCS Std.Dev.": row["CCS Std.Dev."]
-                    })
+# Fit Gaussians to Data Page
+elif page == "Fit Gaussians to Data":
+    st.title("Fit Gaussians to Data")
+    st.subheader("Takes x, y data and helps you fit gaussians and plot a pretty graph.")
+    st.markdown('''This is a super simple tool - upload your ATD/CCSD as a csv file with headings 'x' and 'y' for drift time / CCS and intensity respectively. When you do this, you'll see your data visualised with starting guesses at the peak maxima. Input the number of gaussians you see and their approximate positions. The script uses the data +/- 5% of the inputted peak position to fit gaussians to each peak. This will work well if you have relatively well-resolved peaks - if you don't, then this is not the tool for you. The purpose of this method is to avoid overfitting small features.''')
+    upload_and_plot()
 
-            # Create output for each protein
-            output_buffers = {}
+# Calibrate Page
+elif page == "Calibrate":
+    st.title("Calibrate (with IMSCal)")
+    st.subheader("Takes ATDs of Calibrants and Returns IMSCal Reference File AND a CSV for the Old Method.")
+    st.markdown('''For now this tool doesn't allow you to bypass the tedious MassLynx stuff - in future it will use TWIMExtract. To use this tool, make a folder for each calibrant titled the name of the calibrant (see Bush Database for calibrant names). In each folder, paste the ATD for each charge state in turn into a text file called x.txt where x is the charge state. Zip these folders and upload it here.''')
+    calibrate_page()
 
-            for root, _, files in os.walk(tmpdir):
-                for file in files:
-                    if file.endswith(".txt") and file.split(".")[0].isdigit():
-                        charge_state = int(file.split(".")[0])
-                        protein_name = os.path.basename(root)
-                        key = (protein_name, charge_state)
-                        cal_data = calibration_lookup.get(key)
+# Generate Input Files Page
+elif page == "Generate Input Files":
+    st.title("Get Input Files")
+    generate_input_dat_files_app()
 
-                        if not cal_data:
-                            continue
+# Process Outputs Page
+elif page == "Process Outputs":
+    st.title("Process Output Files")
 
-                        file_path = os.path.join(root, file)
-                        try:
-                            raw_df = pd.read_csv(file_path, sep="\t", header=None, names=["Drift", "Intensity"])
-                        except Exception:
-                            continue
+elif page == "Calibrate Drift Files":
+    calibrate_drift_files_page()
 
-                        if data_type == "Cyclic":
-                            raw_df["Drift"] = raw_df["Drift"] - inject_time
-
-                        # Match calibration drift times to intensities
-                        out_rows = []
-                        for entry in cal_data:
-                            drift_val = entry["Drift"]
-                            # Find the row in raw_df with the closest drift time
-                            closest_idx = (raw_df["Drift"] - drift_val).abs().idxmin()
-                            matched_intensity = raw_df.loc[closest_idx, "Intensity"]
-
-                            out_rows.append({
-                                "Charge": charge_state,
-                                "Drift": drift_val,
-                                "CCS": entry["CCS"],
-                                "CCS Std.Dev.": entry["CCS Std.Dev."],
-                                "Intensity": matched_intensity
-                            })
-
-                        out_df = pd.DataFrame(out_rows)
-
-                        out_key = f"{protein_name}.csv"
-                        if out_key not in output_buffers:
-                            output_buffers[out_key] = []
-                        output_buffers[out_key].append(out_df)
-
-            if output_buffers:
-                zip_buffer = BytesIO()
-                with zipfile.ZipFile(zip_buffer, "w") as zip_out:
-                    for filename, dfs in output_buffers.items():
-                        combined = pd.concat(dfs, ignore_index=True)
-                        csv_bytes = combined.to_csv(index=False).encode("utf-8")
-                        zip_out.writestr(filename, csv_bytes)
-
-                zip_buffer.seek(0)
-                st.download_button(
-                    label="Download Calibrated Drift Data (ZIP)",
-                    data=zip_buffer,
-                    file_name="calibrated_drift_data.zip",
-                    mime="application/zip"
-                )
-            else:
-                st.warning("No matching calibration or intensity data found.")
-
+    process_outputs_page()
 
