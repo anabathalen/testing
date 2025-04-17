@@ -25,6 +25,14 @@ def process_outputs_page():
 
             st.success("Zip file extracted!")
 
+            st.write("📁 File tree inside ZIP:")
+            for root, dirs, files in os.walk(tmpdir):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, tmpdir)
+                    st.text(f"  - {rel_path}")
+
+
             protein_data = {}
 
             st.write("🔍 Scanning extracted files...")
