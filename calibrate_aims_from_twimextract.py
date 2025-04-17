@@ -22,7 +22,7 @@ def twim_extract_page():
         # Read calibration data
         cal_df = pd.read_csv(calibration_file)
         st.write("Uploaded Calibration Data:")
-        st.dataframe(cal_df.head())
+        st.dataframe(calibrated_df.head())
 
         if 'Z' not in cal_df.columns:
             st.error("Calibration data must include a 'Z' column for charge state.")
@@ -111,21 +111,27 @@ def twim_extract_page():
             aggfunc="mean"
         )
 
+        # Crop heatmap data based on user-selected ranges
         heatmap_data = heatmap_data.loc[
             (heatmap_data.index >= y_min) & (heatmap_data.index <= y_max),
             (heatmap_data.columns >= x_min) & (heatmap_data.columns <= x_max)
         ]
 
         fig, ax = plt.subplots(figsize=(figure_size, figure_size), dpi=dpi)
+
+        # Generate the heatmap
         sns.heatmap(
-            heatmap_data.sort_index(ascending=False),
+            heatmap_data.sort_index(ascending=False),  # Sort index to get CCS in descending order
             cmap=color_map,
             ax=ax,
             cbar=False,  # Remove the color bar
             xticklabels=True,
-            yticklabels=True
+            yticklabels=True,
+            linewidths=0.5,  # Optional: add some line widths for better separation
+            linecolor='white'  # Optional: set the line color between blocks for separation
         )
 
+        # Set axis labels and adjust tick marks
         ax.set_xlabel("Collision Voltage", fontsize=font_size)
         ax.set_ylabel("CCS", fontsize=font_size)
         ax.tick_params(labelsize=font_size)
@@ -182,5 +188,3 @@ def twim_extract_page():
 # Run the app
 if __name__ == "__main__":
     twim_extract_page()
-
-
