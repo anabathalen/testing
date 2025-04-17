@@ -108,11 +108,23 @@ def twim_extract_page():
             st.write("Calibrated Data:")
             st.dataframe(calibrated_df.head())
 
-            # Ask for customization options for the heatmap
+            # Customization options for the heatmap
             resolution = st.slider("Resolution", min_value=1, max_value=50, value=10, step=1)
             color_map = st.selectbox("Color Map", ["viridis", "plasma", "inferno", "cividis", "coolwarm", "magma"])
             font_size = st.slider("Font Size", min_value=8, max_value=24, value=12, step=1)
             figure_size = st.slider("Figure Size (inches)", min_value=5, max_value=15, value=10, step=1)
+
+            # Range for cropping
+            x_min, x_max = st.slider("Crop Collision Voltage Range", min_value=int(calibrated_df["Collision Voltage"].min()),
+                                      max_value=int(calibrated_df["Collision Voltage"].max()), 
+                                      value=(int(calibrated_df["Collision Voltage"].min()), int(calibrated_df["Collision Voltage"].max())))
+            y_min, y_max = st.slider("Crop CCS Range", min_value=int(calibrated_df["CCS"].min()),
+                                      max_value=int(calibrated_df["CCS"].max()), 
+                                      value=(int(calibrated_df["CCS"].min()), int(calibrated_df["CCS"].max())))
+
+            # Specific labels for CCS and Collision Voltages
+            ccs_labels = st.multiselect("Label specific CCS values", options=calibrated_df["CCS"].unique())
+            collision_voltages_labels = st.multiselect("Label specific Collision Voltages", options=calibrated_df["Collision Voltage"].unique())
 
             # Ensure numeric sorting
             calibrated_df["Collision Voltage"] = pd.to_numeric(calibrated_df["Collision Voltage"], errors='coerce')
@@ -131,12 +143,25 @@ def twim_extract_page():
 
             # Plot the heatmap
             plt.figure(figsize=(figure_size, figure_size))
-            sns.heatmap(heatmap_data, cmap=color_map, annot=False, cbar=True, square=True)
+            ax = sns.heatmap(heatmap_data, cmap=color_map, annot=False, cbar=True, square=True, 
+                             xticklabels=resolution, yticklabels=resolution, vmin=0, vmax=heatmap_data.max().max())
+
+            # Label specific CCS and Collision Voltages
+            for label in ccs_labels:
+                ax.text(0, label, str(label), color='black', ha='center', va='center', fontsize=font_size)
+            for label in collision_voltages_labels:
+                ax.text(label, 0, str(label), color='black', ha='center', va='center', fontsize=font_size)
+
+            # Customize ticks and axis
             plt.title("CCS vs Collision Voltage Heatmap", fontsize=font_size)
             plt.xlabel("Collision Voltage", fontsize=font_size)
             plt.ylabel("CCS", fontsize=font_size)
             plt.xticks(rotation=45, fontsize=font_size)
             plt.yticks(rotation=0, fontsize=font_size)
+
+            # Adjust the range of axes
+            ax.set_xlim(x_min, x_max)
+            ax.set_ylim(y_max, y_min)  # Flip the y-axis
 
             # Display the heatmap
             st.pyplot()
