@@ -14,6 +14,9 @@ def twim_extract_page():
         # Read the TWIM extract data
         twim_df = pd.read_csv(twim_extract_file, header=None)
         
+        # Explicitly set the first column as "Drift Time" and use the rest of the columns' headers
+        twim_df.columns = ["Drift Time"] + [str(i) for i in range(1, len(twim_df.columns))]
+        
         # Display the first few rows for user confirmation
         st.write("Uploaded TWIM Extract Data:")
         st.dataframe(twim_df.head())
@@ -40,7 +43,7 @@ def twim_extract_page():
         if st.button("Process Data"):
             # Adjust drift time for Cyclic data (if needed)
             if inject_time is not None and data_type == "Cyclic":
-                twim_df[0] = twim_df[0] - inject_time  # Subtract the injection time from the drift time
+                twim_df["Drift Time"] = twim_df["Drift Time"] - inject_time  # Subtract the injection time from the drift time
 
             # Extract calibration data for the given charge state (Z)
             cal_data = cal_df[cal_df["Z"] == charge_state]
@@ -58,7 +61,7 @@ def twim_extract_page():
             calibrated_data = []
 
             # The first column of the TWIM extract file contains drift time
-            drift_times = twim_df[0]
+            drift_times = twim_df["Drift Time"]
 
             # The remaining columns represent the intensity at various collision energies
             collision_voltages = twim_df.columns[1:]  # Starting from the second column (column indices 1 to N)
@@ -67,6 +70,10 @@ def twim_extract_page():
                 intensities = twim_df.iloc[idx, 1:].values  # All columns after the first one are intensities
                 
                 # Find the closest drift time in the calibration data
+                if pd.isna(drift_time):
+                    # Skip if the drift time is NaN
+                    continue
+
                 closest_drift_idx = (cal_data["Drift"] - drift_time).abs().idxmin()
                 ccs_value = cal_data.loc[closest_drift_idx, "CCS"]
                 
@@ -90,3 +97,4 @@ def twim_extract_page():
                 file_name="calibrated_twim_extract.csv",
                 mime="text/csv"
             )
+
