@@ -114,6 +114,13 @@ def twim_extract_page():
             font_size = st.slider("Font Size", min_value=8, max_value=24, value=12, step=1)
             figure_size = st.slider("Figure Size (inches)", min_value=5, max_value=15, value=10, step=1)
 
+            # Ensure numeric sorting
+            calibrated_df["Collision Voltage"] = pd.to_numeric(calibrated_df["Collision Voltage"], errors='coerce')
+            calibrated_df["CCS"] = pd.to_numeric(calibrated_df["CCS"], errors='coerce')
+
+            # Sort by Collision Voltage and CCS in ascending order
+            calibrated_df = calibrated_df.sort_values(by=["Collision Voltage", "CCS"])
+
             # Create a pivot table for heatmap visualization
             heatmap_data = calibrated_df.pivot_table(
                 index="CCS", 
