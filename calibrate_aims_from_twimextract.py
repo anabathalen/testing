@@ -28,6 +28,11 @@ def twim_extract_page():
         st.write("Uploaded Calibration Data:")
         st.dataframe(cal_df.head())
         
+        # Check if the 'Z' column exists in the calibration file
+        if 'Z' not in cal_df.columns:
+            st.error("Calibration data must include a 'Z' column for charge state. Please check the file.")
+            return
+
         # Ask for the data type (Synapt or Cyclic)
         data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
         
@@ -97,4 +102,3 @@ def twim_extract_page():
                 file_name="calibrated_twim_extract.csv",
                 mime="text/csv"
             )
-
