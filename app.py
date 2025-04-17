@@ -57,5 +57,4 @@ elif page == "Calibrate Drift Files":
     calibrate_drift_files_page()
 
 elif page == "Calibrate CIU":
-    title("Testing")
     twim_extract_page()
