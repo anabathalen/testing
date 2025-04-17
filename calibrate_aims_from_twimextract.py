@@ -83,9 +83,13 @@ def twim_extract_page():
         # Customization section
         st.header("📊 CIU Heatmap Customization")
 
-        color_map = st.selectbox("Color Map", ["viridis", "plasma", "inferno", "cividis", "coolwarm", "magma"])
+        color_map = st.selectbox("Color Map", [
+            "viridis", "plasma", "inferno", "cividis", "coolwarm", "magma", 
+            "Blues", "Greens", "Purples", "Oranges", "Reds", "Greens_r", 
+            "Purples_r", "Blues_r", "Oranges_r", "Reds_r", "Spectral"
+        ])
         font_size = st.slider("Font Size", 8, 24, 12, 1)
-        figure_size = st.slider("Figure Size (inches)", 5, 15, 10, 1)
+        figure_size = st.slider("Figure Size (inches)", 1, 12, 10, 1)
         dpi = st.slider("Figure Resolution (DPI)", 100, 1000, 300, 50)
 
         x_min, x_max = st.slider("Crop Collision Voltage Range",
@@ -124,8 +128,11 @@ def twim_extract_page():
         ax.set_ylabel("CCS", fontsize=font_size)
         ax.tick_params(labelsize=font_size)
 
-        # Add color bar
-        fig.colorbar(c, ax=ax)
+        # Add a black line around the heatmap
+        ax.spines['top'].set_color('black')
+        ax.spines['right'].set_color('black')
+        ax.spines['bottom'].set_color('black')
+        ax.spines['left'].set_color('black')
 
         # Add dashed lines based on user input for x-values and y-values
         num_x_labels = st.slider("How many x-values to label (0-5)?", 0, 5, 0)
@@ -165,7 +172,6 @@ def twim_extract_page():
         fig.savefig(img, format='png', bbox_inches="tight")
         img.seek(0)
         st.download_button("Download CIU Heatmap Image", data=img, file_name="ciu_heatmap.png", mime="image/png")
-
 
 # Run the app
 if __name__ == "__main__":
