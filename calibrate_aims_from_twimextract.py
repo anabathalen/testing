@@ -35,7 +35,7 @@ def twim_extract_page():
         if data_type == "Cyclic":
             inject_time = st.number_input("Enter the injection time (ms)", min_value=0.0, value=0.0, step=0.1)
 
-                # Button to process data
+        # Button to process data
         if st.button("Process Data"):
             if inject_time is not None and data_type == "Cyclic":
                 twim_df["Drift Time"] = twim_df["Drift Time"] - inject_time
@@ -103,9 +103,6 @@ def twim_extract_page():
             (float(calibrated_df["CCS"].min()), float(calibrated_df["CCS"].max()))
         )
 
-        ccs_labels = st.multiselect("Label specific CCS values", options=np.round(calibrated_df["CCS"].unique(), 2).tolist())
-        cv_labels = st.multiselect("Label specific Collision Voltages", options=np.round(calibrated_df["Collision Voltage"].unique(), 2).tolist())
-
         # Prepare pivot table
         heatmap_data = calibrated_df.pivot_table(
             index="CCS",
@@ -124,23 +121,36 @@ def twim_extract_page():
             heatmap_data.sort_index(ascending=False),
             cmap=color_map,
             ax=ax,
-            cbar=True,
+            cbar=False,  # Remove the color bar
             xticklabels=True,
             yticklabels=True
         )
 
         ax.set_xlabel("Collision Voltage", fontsize=font_size)
         ax.set_ylabel("CCS", fontsize=font_size)
-        ax.set_title("CIU Heatmap", fontsize=font_size + 2)
         ax.tick_params(labelsize=font_size)
 
-        # Add optional label lines
-        for label in ccs_labels:
-            if label in heatmap_data.index:
-                ax.axhline(y=heatmap_data.index.get_loc(label), color='white', linestyle='--', linewidth=1)
-        for label in cv_labels:
-            if label in heatmap_data.columns:
-                ax.axvline(x=heatmap_data.columns.get_loc(label), color='white', linestyle='--', linewidth=1)
+        # Adjust axes to have sensible tick marks
+        ax.set_xticks(np.linspace(x_min, x_max, num=10))  # 10 ticks along x-axis
+        ax.set_xticklabels(np.round(np.linspace(x_min, x_max, num=10), 0))  # Round values
+        ax.set_yticks(np.linspace(y_min, y_max, num=10))  # 10 ticks along y-axis
+        ax.set_yticklabels(np.round(np.linspace(y_min, y_max, num=10), 0))  # Round values
+
+        # User input for labels
+        label_values = st.text_area("Enter CCS or Collision Voltage values to label (comma separated)")
+        label_text = st.text_input("Enter the label text")
+        if label_values and label_text:
+            label_values = [float(val) for val in label_values.split(',')]
+            for label in label_values:
+                if label in heatmap_data.index or label in heatmap_data.columns:
+                    if label in heatmap_data.index:
+                        y_pos = heatmap_data.index.get_loc(label)
+                        ax.axhline(y=y_pos, color='white', linestyle='--', linewidth=1)
+                        ax.text(x=heatmap_data.columns[0], y=y_pos, s=label_text, color='white', va='center', ha='left', fontsize=font_size)
+                    if label in heatmap_data.columns:
+                        x_pos = heatmap_data.columns.get_loc(label)
+                        ax.axvline(x=x_pos, color='white', linestyle='--', linewidth=1)
+                        ax.text(x=x_pos, y=heatmap_data.index[0], s=label_text, color='white', va='bottom', ha='center', fontsize=font_size)
 
         plt.tight_layout()
         st.pyplot(fig)
@@ -157,3 +167,4 @@ def twim_extract_page():
 # Run the app
 if __name__ == "__main__":
     twim_extract_page()
+
