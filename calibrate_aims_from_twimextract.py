@@ -22,7 +22,7 @@ def twim_extract_page():
         # Read calibration data
         cal_df = pd.read_csv(calibration_file)
         st.write("Uploaded Calibration Data:")
-        st.dataframe(calibrated_df.head())
+        st.dataframe(cal_df.head())  # Fix: Change to `cal_df`, not `calibrated_df`
 
         if 'Z' not in cal_df.columns:
             st.error("Calibration data must include a 'Z' column for charge state.")
@@ -179,10 +179,10 @@ def twim_extract_page():
         # Download buttons
         csv = calibrated_df.to_csv(index=False).encode('utf-8')
         st.download_button("Download Calibrated CSV", data=csv, file_name="calibrated_twim_extract.csv", mime="text/csv")
-
-        buf = BytesIO()
-        fig.savefig(buf, format="png", dpi=dpi)
-        st.download_button("Download Heatmap PNG", data=buf.getvalue(), file_name="ciu_heatmap.png", mime="image/png")
+        img = BytesIO()
+        fig.savefig(img, format='png', bbox_inches="tight")
+        img.seek(0)
+        st.download_button("Download CIU Heatmap Image", data=img, file_name="ciu_heatmap.png", mime="image/png")
 
 
 # Run the app
