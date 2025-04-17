@@ -78,8 +78,18 @@ def twim_extract_page():
                 if pd.isna(drift_time):
                     # Skip if the drift time is NaN
                     continue
+                
+                # Round drift time for precision matching
+                drift_time_rounded = round(drift_time, 4)  # Adjust to the desired decimal precision
 
-                closest_drift_idx = (cal_data["Drift"] - drift_time).abs().idxmin()
+                # Check if there's an exact match first, then fall back to closest match
+                exact_match_idx = cal_data[cal_data["Drift"].round(4) == drift_time_rounded].index
+                if len(exact_match_idx) > 0:
+                    closest_drift_idx = exact_match_idx[0]
+                else:
+                    # If no exact match, get the closest drift time
+                    closest_drift_idx = (cal_data["Drift"] - drift_time_rounded).abs().idxmin()
+                
                 ccs_value = cal_data.loc[closest_drift_idx, "CCS"]
                 
                 # Store the calibrated data
