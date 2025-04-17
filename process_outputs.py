@@ -1,3 +1,12 @@
+# process_outputs.py
+import streamlit as st
+import zipfile
+import tempfile
+import os
+import pandas as pd
+from io import BytesIO, StringIO
+
+
 def process_outputs_page():
     st.title("Process Outputs")
     st.subheader("Upload zipped output folders for each protein sample (with output_X.dat files inside).")
