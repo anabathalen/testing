@@ -13,8 +13,18 @@ def twim_extract_page():
     calibration_file = st.file_uploader("Upload the calibration CSV file", type="csv")
     
     if twim_extract_file and calibration_file:
-        # Read TWIM extract data
-        twim_df = pd.read_csv(twim_extract_file, header=None)
+        # Read the first row of the TWIM extract to check if it contains hashtags
+        first_row = twim_extract_file.readline().decode("utf-8")
+
+        # Check if the first row contains a hashtag, indicating metadata
+        if first_row.startswith("#"):
+            # Skip the first two rows (metadata rows)
+            twim_df = pd.read_csv(twim_extract_file, header=2)
+        else:
+            # Proceed as normal if no hashtags are found
+            twim_df = pd.read_csv(twim_extract_file)
+
+        # Set column names based on the first line of data after skipping (if applicable)
         twim_df.columns = ["Drift Time"] + [str(i) for i in range(1, len(twim_df.columns))]
         st.write("Uploaded TWIM Extract Data:")
         st.dataframe(twim_df.head())
@@ -173,6 +183,3 @@ def twim_extract_page():
         img.seek(0)
         st.download_button("Download CIU Heatmap Image", data=img, file_name="ciu_heatmap.png", mime="image/png")
 
-# Run the app
-if __name__ == "__main__":
-    twim_extract_page()
