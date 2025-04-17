@@ -1,68 +1,151 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import seaborn as sns
 import matplotlib.pyplot as plt
+from io import BytesIO
 
-def plot_ciu_heatmap(df):
-    st.subheader("CIU Heatmap")
+def twim_extract_page():
+    st.title("TWIM CCS Calibration and CIU Heatmap Generator")
 
-    # === User controls ===
-    colormap = st.selectbox("Select Colormap", plt.colormaps(), index=plt.colormaps().index("viridis"))
-    font_size = st.slider("Font size", 8, 24, 12)
-    fig_width = st.slider("Figure width", 4, 20, 10)
-    fig_height = st.slider("Figure height", 4, 20, 6)
-    dpi = st.slider("Figure resolution (dpi)", 100, 1000, 300)
+    # Upload files
+    twim_extract_file = st.file_uploader("Upload the TWIM Extract CSV file", type="csv")
+    calibration_file = st.file_uploader("Upload the calibration CSV file", type="csv")
     
-    # Optional cropping
-    crop_x = st.checkbox("Crop X-axis (Collision Voltage)")
-    x_min, x_max = None, None
-    if crop_x:
-        x_min = st.number_input("X min", value=float(df['Collision Voltage'].min()))
-        x_max = st.number_input("X max", value=float(df['Collision Voltage'].max()))
-    
-    crop_y = st.checkbox("Crop Y-axis (CCS)")
-    y_min, y_max = None, None
-    if crop_y:
-        y_min = st.number_input("Y min", value=float(df['CCS'].min()))
-        y_max = st.number_input("Y max", value=float(df['CCS'].max()))
+    if twim_extract_file and calibration_file:
+        # Read TWIM extract data
+        twim_df = pd.read_csv(twim_extract_file, header=None)
+        twim_df.columns = ["Drift Time"] + [str(i) for i in range(1, len(twim_df.columns))]
+        st.write("Uploaded TWIM Extract Data:")
+        st.dataframe(twim_df.head())
 
-    # Labels
-    label_cvs = st.multiselect("Label specific Collision Voltages", sorted(df['Collision Voltage'].unique().tolist()))
-    label_ccs = st.multiselect("Label specific CCS values", sorted(df['CCS'].unique().tolist()))
+        # Read calibration data
+        cal_df = pd.read_csv(calibration_file)
+        st.write("Uploaded Calibration Data:")
+        st.dataframe(cal_df.head())
 
-    # === Prepare data ===
-    pivot = df.pivot(index="CCS", columns="Collision Voltage", values="Intensity")
-    pivot = pivot.sort_index(ascending=False)  # Flip CCS axis
+        if 'Z' not in cal_df.columns:
+            st.error("Calibration data must include a 'Z' column for charge state.")
+            return
 
-    # Optional cropping
-    if crop_x:
-        pivot = pivot.loc[:, (pivot.columns >= x_min) & (pivot.columns <= x_max)]
-    if crop_y:
-        pivot = pivot.loc[(pivot.index >= y_min) & (pivot.index <= y_max), :]
+        data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
+        charge_state = st.number_input("Enter the charge state of the protein (Z)", min_value=1, max_value=10, step=1)
+        inject_time = None
 
-    # === Plot ===
-    fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=dpi)
-    im = ax.imshow(pivot, aspect='auto', cmap=colormap,
-                   extent=[pivot.columns.min(), pivot.columns.max(), pivot.index.min(), pivot.index.max()],
-                   origin='lower')
+        if data_type == "Cyclic":
+            inject_time = st.number_input("Enter the injection time (ms)", min_value=0.0, value=0.0, step=0.1)
 
-    # Axis settings
-    ax.set_xlabel("Collision Voltage (V)", fontsize=font_size)
-    ax.set_ylabel("CCS (Å²)", fontsize=font_size)
-    ax.tick_params(labelsize=font_size - 2)
+        if st.button("Process Data"):
+            if inject_time is not None and data_type == "Cyclic":
+                twim_df["Drift Time"] = twim_df["Drift Time"] - inject_time
 
-    # Gridline labels
-    for val in label_cvs:
-        ax.axvline(x=val, color='white', linestyle='--', linewidth=0.8)
-    for val in label_ccs:
-        ax.axhline(y=val, color='white', linestyle='--', linewidth=0.8)
+            cal_data = cal_df[cal_df["Z"] == charge_state]
 
-    # Smarter ticks
-    ax.set_xticks(np.linspace(pivot.columns.min(), pivot.columns.max(), 6))
-    ax.set_yticks(np.linspace(pivot.index.min(), pivot.index.max(), 6))
+            if cal_data.empty:
+                st.error(f"No calibration data found for charge state {charge_state}")
+                return
 
-    cbar = fig.colorbar(im, ax=ax)
-    cbar.ax.tick_params(labelsize=font_size - 2)
-    cbar.set_label("Intensity", fontsize=font_size)
+            if "Drift" not in cal_data.columns or "CCS" not in cal_data.columns:
+                st.error("Calibration data must include 'Drift' and 'CCS' columns.")
+                return
 
-    st.pyplot(fig)
+            cal_data["CCS Std.Dev."] = cal_data["CCS Std.Dev."].fillna(0)
+            cal_data = cal_data[cal_data["CCS Std.Dev."] <= 0.1 * cal_data["CCS"]]
+            cal_data["Drift (ms)"] = cal_data["Drift"] * 1000
+
+            calibrated_data = []
+            drift_times = twim_df["Drift Time"]
+            collision_voltages = twim_df.columns[1:]
+
+            for idx, drift_time in enumerate(drift_times):
+                intensities = twim_df.iloc[idx, 1:].values
+                if pd.isna(drift_time):
+                    continue
+
+                drift_time_rounded = round(drift_time, 4)
+                closest_idx = (cal_data["Drift (ms)"] - drift_time_rounded).abs().idxmin()
+                ccs_value = cal_data.loc[closest_idx, "CCS"]
+
+                for col_idx, intensity in enumerate(intensities):
+                    cv = collision_voltages[col_idx]
+                    calibrated_data.append([ccs_value, drift_time, float(cv), intensity])
+
+            calibrated_df = pd.DataFrame(calibrated_data, columns=["CCS", "Drift Time", "Collision Voltage", "Intensity"])
+            calibrated_df["Collision Voltage"] = pd.to_numeric(calibrated_df["Collision Voltage"], errors='coerce')
+            calibrated_df["CCS"] = pd.to_numeric(calibrated_df["CCS"], errors='coerce')
+            calibrated_df = calibrated_df.sort_values(by=["Collision Voltage", "CCS"])
+
+            st.write("Calibrated Data:")
+            st.dataframe(calibrated_df.head())
+
+            # --- Heatmap Customization ---
+            st.header("📊 CIU Heatmap Customization")
+
+            color_map = st.selectbox("Color Map", ["viridis", "plasma", "inferno", "cividis", "coolwarm", "magma"])
+            font_size = st.slider("Font Size", 8, 24, 12, 1)
+            figure_size = st.slider("Figure Size (inches)", 5, 15, 10, 1)
+            dpi = st.slider("Figure Resolution (DPI)", 100, 1000, 300, 50)
+
+            x_min, x_max = st.slider("Crop Collision Voltage Range",
+                float(calibrated_df["Collision Voltage"].min()),
+                float(calibrated_df["Collision Voltage"].max()),
+                (float(calibrated_df["Collision Voltage"].min()), float(calibrated_df["Collision Voltage"].max()))
+            )
+            y_min, y_max = st.slider("Crop CCS Range",
+                float(calibrated_df["CCS"].min()),
+                float(calibrated_df["CCS"].max()),
+                (float(calibrated_df["CCS"].min()), float(calibrated_df["CCS"].max()))
+            )
+
+            ccs_labels = st.multiselect("Label specific CCS values", options=np.round(calibrated_df["CCS"].unique(), 2).tolist())
+            cv_labels = st.multiselect("Label specific Collision Voltages", options=np.round(calibrated_df["Collision Voltage"].unique(), 2).tolist())
+
+            heatmap_data = calibrated_df.pivot_table(
+                index="CCS",
+                columns="Collision Voltage",
+                values="Intensity",
+                aggfunc="mean"
+            )
+
+            heatmap_data = heatmap_data.loc[
+                (heatmap_data.index >= y_min) & (heatmap_data.index <= y_max),
+                (heatmap_data.columns >= x_min) & (heatmap_data.columns <= x_max)
+            ]
+
+            # --- Plotting ---
+            fig, ax = plt.subplots(figsize=(figure_size, figure_size), dpi=dpi)
+            sns.heatmap(
+                heatmap_data.sort_index(ascending=False),
+                cmap=color_map,
+                ax=ax,
+                cbar=True,
+                square=False,
+                xticklabels=True,
+                yticklabels=True
+            )
+
+            ax.set_xlabel("Collision Voltage", fontsize=font_size)
+            ax.set_ylabel("CCS", fontsize=font_size)
+            ax.set_title("CIU Heatmap", fontsize=font_size + 2)
+            ax.tick_params(labelsize=font_size)
+
+            # Optional label lines
+            for label in ccs_labels:
+                ax.axhline(y=heatmap_data.index.get_loc(label), color='white', linestyle='--', linewidth=1)
+            for label in cv_labels:
+                ax.axvline(x=heatmap_data.columns.get_loc(label), color='white', linestyle='--', linewidth=1)
+
+            plt.tight_layout()
+            st.pyplot(fig)
+
+            # --- Download options ---
+            csv = calibrated_df.to_csv(index=False).encode('utf-8')
+            st.download_button("Download Calibrated CSV", data=csv, file_name="calibrated_twim_extract.csv", mime="text/csv")
+
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=dpi)
+            st.download_button("Download Heatmap PNG", data=buf.getvalue(), file_name="ciu_heatmap.png", mime="image/png")
+
+# Run the app
+if __name__ == "__main__":
+    twim_extract_page()
