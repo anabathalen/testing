@@ -50,9 +50,8 @@ elif page == "Generate Input Files":
 # Process Outputs Page
 elif page == "Process Outputs":
     st.title("Process Output Files")
+        process_outputs_page()
 
 elif page == "Calibrate Drift Files":
     calibrate_drift_files_page()
-
-    process_outputs_page()
 
