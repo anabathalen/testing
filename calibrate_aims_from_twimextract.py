@@ -130,27 +130,42 @@ def twim_extract_page():
         ax.set_ylabel("CCS", fontsize=font_size)
         ax.tick_params(labelsize=font_size)
 
-        # Adjust axes to have sensible tick marks
+        # Adjust axes to have sensible tick marks (rounded to nearest 100 or 200)
         ax.set_xticks(np.linspace(x_min, x_max, num=10))  # 10 ticks along x-axis
         ax.set_xticklabels(np.round(np.linspace(x_min, x_max, num=10), 0))  # Round values
         ax.set_yticks(np.linspace(y_min, y_max, num=10))  # 10 ticks along y-axis
         ax.set_yticklabels(np.round(np.linspace(y_min, y_max, num=10), 0))  # Round values
 
-        # User input for labels
-        label_values = st.text_area("Enter CCS or Collision Voltage values to label (comma separated)")
-        label_text = st.text_input("Enter the label text")
-        if label_values and label_text:
-            label_values = [float(val) for val in label_values.split(',')]
-            for label in label_values:
-                if label in heatmap_data.index or label in heatmap_data.columns:
-                    if label in heatmap_data.index:
-                        y_pos = heatmap_data.index.get_loc(label)
-                        ax.axhline(y=y_pos, color='white', linestyle='--', linewidth=1)
-                        ax.text(x=heatmap_data.columns[0], y=y_pos, s=label_text, color='white', va='center', ha='left', fontsize=font_size)
-                    if label in heatmap_data.columns:
-                        x_pos = heatmap_data.columns.get_loc(label)
-                        ax.axvline(x=x_pos, color='white', linestyle='--', linewidth=1)
-                        ax.text(x=x_pos, y=heatmap_data.index[0], s=label_text, color='white', va='bottom', ha='center', fontsize=font_size)
+        # User input for x-value labeling (0-5)
+        num_x_labels = st.slider("How many x-values to label (0-5)?", 0, 5, 0)
+        x_values = []
+        x_labels = []
+        for i in range(num_x_labels):
+            value = st.number_input(f"Enter x-value {i+1}", min_value=float(x_min), max_value=float(x_max))
+            label = st.text_input(f"Enter label for x-value {i+1}")
+            x_values.append(value)
+            x_labels.append(label)
+
+        # User input for y-value labeling (0-5)
+        num_y_labels = st.slider("How many y-values to label (0-5)?", 0, 5, 0)
+        y_values = []
+        y_labels = []
+        for i in range(num_y_labels):
+            value = st.number_input(f"Enter y-value {i+1}", min_value=float(y_min), max_value=float(y_max))
+            label = st.text_input(f"Enter label for y-value {i+1}")
+            y_values.append(value)
+            y_labels.append(label)
+
+        # Plot the dashed lines and add labels based on user input
+        for i in range(num_x_labels):
+            x_pos = np.argmin(np.abs(np.array(heatmap_data.columns) - x_values[i]))  # Find nearest x value
+            ax.axvline(x=x_pos, color='white', linestyle='--', linewidth=1)
+            ax.text(x=x_pos, y=heatmap_data.index[0], s=x_labels[i], color='white', va='bottom', ha='center', fontsize=font_size)
+
+        for i in range(num_y_labels):
+            y_pos = np.argmin(np.abs(np.array(heatmap_data.index) - y_values[i]))  # Find nearest y value
+            ax.axhline(y=y_pos, color='white', linestyle='--', linewidth=1)
+            ax.text(x=heatmap_data.columns[0], y=y_pos, s=y_labels[i], color='white', va='center', ha='left', fontsize=font_size)
 
         plt.tight_layout()
         st.pyplot(fig)
@@ -167,4 +182,5 @@ def twim_extract_page():
 # Run the app
 if __name__ == "__main__":
     twim_extract_page()
+
 
