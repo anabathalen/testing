@@ -5,11 +5,12 @@ from calibrate import calibrate_page
 from generate_input_files import generate_input_dat_files_app
 from process_outputs import process_outputs_page
 from calibrate_drift_files import calibrate_drift_files_page
+from calibrate_aims_from_twimextract import twim_extract_page
 
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files"])
+page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files", "Calibrate CIU"])
 
 # Check if the page has changed, to ensure no redundant loading
 if "page" not in st.session_state or st.session_state["page"] != page:
@@ -55,3 +56,5 @@ elif page == "Process Outputs":
 elif page == "Calibrate Drift Files":
     calibrate_drift_files_page()
 
+elif page == "Calibrate CIU":
+    twim_extract_page()
