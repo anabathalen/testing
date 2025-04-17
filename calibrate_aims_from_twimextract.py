@@ -62,6 +62,10 @@ def twim_extract_page():
                 st.error("Calibration data must include 'Drift' and 'CCS' columns.")
                 return
 
+            # Filter out calibration data where the standard deviation of CCS is greater than 10% of the CCS value
+            cal_data['CCS Std.Dev.'] = cal_data['CCS Std.Dev.'].fillna(0)  # Handle missing std deviation values
+            cal_data = cal_data[cal_data['CCS Std.Dev.'] <= 0.1 * cal_data['CCS']]  # Keep only valid data
+            
             # Now, calibrate the TWIM extract data
             calibrated_data = []
 
@@ -70,9 +74,6 @@ def twim_extract_page():
 
             # The remaining columns represent the intensity at various collision energies
             collision_voltages = twim_df.columns[1:]  # Starting from the second column (column indices 1 to N)
-
-            # Add debug print to show what drift times we're matching
-            st.write(f"TWIM Extract Drift Times: {drift_times.head()}")
 
             for idx, drift_time in enumerate(drift_times):
                 intensities = twim_df.iloc[idx, 1:].values  # All columns after the first one are intensities
@@ -88,18 +89,8 @@ def twim_extract_page():
                 # Multiply the calibration drift times by 1000 (to match TWIM drift times in ms)
                 cal_data["Drift (ms)"] = cal_data["Drift"] * 1000
 
-                # Add debug print to see the rounded drift time
-                st.write(f"Processing Drift Time: {drift_time_rounded}")
-
-                # Check if there's an exact match first, then fall back to closest match
-                exact_match_idx = cal_data[cal_data["Drift (ms)"].round(4) == drift_time_rounded].index
-                if len(exact_match_idx) > 0:
-                    closest_drift_idx = exact_match_idx[0]
-                    st.write(f"Exact match found for Drift Time {drift_time_rounded}: CCS = {cal_data.loc[closest_drift_idx, 'CCS']}")
-                else:
-                    # If no exact match, get the closest drift time
-                    closest_drift_idx = (cal_data["Drift (ms)"] - drift_time_rounded).abs().idxmin()
-                    st.write(f"No exact match, closest Drift Time for {drift_time_rounded} is {cal_data.loc[closest_drift_idx, 'Drift (ms)']} with CCS = {cal_data.loc[closest_drift_idx, 'CCS']}")
+                # Find the closest matching drift time
+                closest_drift_idx = (cal_data["Drift (ms)"] - drift_time_rounded).abs().idxmin()
                 
                 ccs_value = cal_data.loc[closest_drift_idx, "CCS"]
                 
