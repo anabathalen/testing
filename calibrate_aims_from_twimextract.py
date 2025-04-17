@@ -1,6 +1,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
 from io import StringIO
 
 def twim_extract_page():
@@ -105,6 +107,32 @@ def twim_extract_page():
             # Display the calibrated data
             st.write("Calibrated Data:")
             st.dataframe(calibrated_df.head())
+
+            # Ask for customization options for the heatmap
+            resolution = st.slider("Resolution", min_value=1, max_value=50, value=10, step=1)
+            color_map = st.selectbox("Color Map", ["viridis", "plasma", "inferno", "cividis", "coolwarm", "magma"])
+            font_size = st.slider("Font Size", min_value=8, max_value=24, value=12, step=1)
+            figure_size = st.slider("Figure Size (inches)", min_value=5, max_value=15, value=10, step=1)
+
+            # Create a pivot table for heatmap visualization
+            heatmap_data = calibrated_df.pivot_table(
+                index="CCS", 
+                columns="Collision Voltage", 
+                values="Intensity", 
+                aggfunc=np.mean
+            )
+
+            # Plot the heatmap
+            plt.figure(figsize=(figure_size, figure_size))
+            sns.heatmap(heatmap_data, cmap=color_map, annot=False, cbar=True, square=True)
+            plt.title("CCS vs Collision Voltage Heatmap", fontsize=font_size)
+            plt.xlabel("Collision Voltage", fontsize=font_size)
+            plt.ylabel("CCS", fontsize=font_size)
+            plt.xticks(rotation=45, fontsize=font_size)
+            plt.yticks(rotation=0, fontsize=font_size)
+
+            # Display the heatmap
+            st.pyplot()
 
             # Provide a download button for the calibrated CSV
             csv = calibrated_df.to_csv(index=False).encode('utf-8')
