@@ -1,72 +1,68 @@
+# process_outputs.py
+import streamlit as st
+import zipfile
+import tempfile
 import os
 import pandas as pd
+from io import BytesIO, StringIO
 
-def process_data(input_filename, output_filename):
-    # Read the input file
-    input_df = pd.read_csv(input_filename, sep=' ', header=None, names=['Index', 'Mass', 'Z', 'DriftTime'])
+def process_outputs_page():
     
-    # Read the output file
-    with open(output_filename, 'r') as file:
-        lines = file.readlines()
-    
-    # Extract the protein name from the output file
-    protein_name = lines[1].split(',')[0]
-    
-    # Extract calibrated data from the output file (from the [CALIBRATED DATA] section)
-    start_idx = lines.index('[CALIBRATED DATA]\n') + 1
-    calibrated_data = []
-    
-    for line in lines[start_idx:]:
-        if line.strip():  # Ignore empty lines
-            data = line.strip().split(',')
-            calibrated_data.append([data[0], float(data[1]), int(data[2]), float(data[3]), float(data[4]), float(data[5])])
+    uploaded_zip = st.file_uploader("Upload a zipped folder containing output files", type="zip")
 
-    # Convert the calibrated data to a DataFrame
-    calibrated_df = pd.DataFrame(calibrated_data, columns=['ID', 'Mass', 'Z', 'Drift', 'CCS', 'CCS_StdDev'])
+    if uploaded_zip:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            zip_path = os.path.join(tmpdir, "uploaded.zip")
 
-    # Merge the input and calibrated data on 'Mass' and 'DriftTime'
-    merged_data = pd.merge(input_df, calibrated_df, on='Mass', how='left')
+            with open(zip_path, "wb") as f:
+                f.write(uploaded_zip.getvalue())
 
-    # Add the protein name
-    merged_data['Protein'] = protein_name
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(tmpdir)
 
-    return merged_data
+            st.success("Zip file extracted!")
 
-def combine_all_files(input_dir, output_dir, output_csv_path):
-    # Initialize an empty DataFrame to collect all data
-    all_data = []
+            csv_buffers = {}
 
-    # Walk through the input and output directories
-    for protein_folder in os.listdir(input_dir):
-        protein_folder_path = os.path.join(input_dir, protein_folder)
-        
-        if os.path.isdir(protein_folder_path):  # Make sure it's a directory
-            for filename in os.listdir(protein_folder_path):
-                if filename.startswith('input_') and filename.endswith('.txt'):
-                    charge_state = filename.split('_')[1].split('.')[0]
-                    
-                    # Construct corresponding output file path
-                    output_filename = f'output_{charge_state}.txt'
-                    output_file_path = os.path.join(output_dir, protein_folder, output_filename)
-                    input_filename = os.path.join(protein_folder_path, filename)
-                    
-                    # Ensure both input and output files exist
-                    if os.path.exists(input_filename) and os.path.exists(output_file_path):
-                        print(f"Processing {input_filename} and {output_file_path}")
-                        # Process the data and merge
-                        merged_data = process_data(input_filename, output_file_path)
-                        all_data.append(merged_data)
+            for root, dirs, files in os.walk(tmpdir):
+                for file in files:
+                    if file.startswith("output_") and file.endswith(".dat"):
+                        protein_folder = os.path.basename(root)
+                        file_path = os.path.join(root, file)
 
-    # Combine all the data into a single DataFrame
-    final_data = pd.concat(all_data, ignore_index=True)
+                        with open(file_path, 'r') as f:
+                            lines = f.readlines()
 
-    # Save the combined data to a CSV file
-    final_data.to_csv(output_csv_path, index=False)
-    print(f"Combined data saved to {output_csv_path}")
+                        try:
+                            cal_index = next(i for i, line in enumerate(lines) if line.strip() == "[CALIBRATED DATA]")
+                            data_lines = lines[cal_index + 1:]
+                        except StopIteration:
+                            st.warning(f"No [CALIBRATED DATA] section found in {file}")
+                            continue
 
-# Example usage
-input_dir = '/path/to/input/directory'  # Path to the directory containing protein folders
-output_dir = '/path/to/output/directory'  # Path to the directory containing output files
-output_csv_path = 'combined_data.csv'  # Path to save the final combined CSV
+                        try:
+                            df = pd.read_csv(StringIO(''.join(data_lines)))
+                            df = df[['Z', 'Drift', 'CCS', 'CCS Std.Dev.']]
+                        except Exception as e:
+                            st.error(f"Failed to parse calibrated data from {file}: {e}")
+                            continue
 
-combine_all_files(input_dir, output_dir, output_csv_path)
+                        csv_buffer = BytesIO()
+                        df.to_csv(csv_buffer, index=False)
+                        csv_buffer.seek(0)
+
+                        label = f"{protein_folder}_{file.replace('.dat', '.csv')}"
+                        csv_buffers[label] = csv_buffer
+
+            if csv_buffers:
+                st.header("Download Processed CSVs")
+                for label, buffer in csv_buffers.items():
+                    st.download_button(
+                        label=f"Download {label}",
+                        data=buffer,
+                        file_name=label,
+                        mime='text/csv'
+                    )
+            else:
+                st.warning("No output_X.dat files with valid calibrated data found.")
+
