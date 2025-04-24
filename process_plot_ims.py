@@ -97,10 +97,15 @@ def plot_and_scale_page():
         # ==== 2. CCS PLOT WITH SHADING UNDER EACH CHARGE STATE ====
         st.subheader("Scaled Intensity vs CCS by Charge State")
         
-        # Filter CCS data based on the standard deviation smaller than CCS value
-        ccs_std_dev = cal_df.groupby("CCS")["Scaled Intensity"].std().reset_index()
-        ccs_mean = cal_df.groupby("CCS")["Scaled Intensity"].mean().reset_index()
-        filtered_ccs = ccs_mean[ccs_std_dev["Scaled Intensity"] < ccs_mean["Scaled Intensity"]]
+        # Calculate the standard deviation and mean for each CCS value
+        ccs_std_dev = cal_df.groupby("CCS")["Scaled Intensity"].std().reset_index(name="CCS Std.Dev.")
+        ccs_mean = cal_df.groupby("CCS")["Scaled Intensity"].mean().reset_index(name="CCS Mean")
+        
+        # Merge the std dev and mean data
+        ccs_data = pd.merge(ccs_mean, ccs_std_dev, on="CCS")
+
+        # Filter out rows where CCS Std.Dev. > CCS (we exclude rows where the standard deviation is greater than the CCS)
+        filtered_ccs = ccs_data[ccs_data["CCS Std.Dev."] < ccs_data["CCS"]]
 
         # Plotting the CCS plot
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
