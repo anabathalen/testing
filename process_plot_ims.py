@@ -20,8 +20,8 @@ def plot_and_scale_page():
     if cal_file and ms_file and protein_mass > 0:
         # Read calibrated drift data
         cal_df = pd.read_csv(cal_file)
-        if "Charge" not in cal_df.columns or "Intensity" not in cal_df.columns:
-            st.error("The CSV file must contain 'Charge' and 'Intensity' columns.")
+        if "Charge" not in cal_df.columns or "Intensity" not in cal_df.columns or "CCS" not in cal_df.columns or "CCS Std. Dev." not in cal_df.columns:
+            st.error("The CSV file must contain 'Charge', 'Intensity', 'CCS', and 'CCS Std. Dev.' columns.")
             return
 
         # Read mass spectrum data
@@ -97,21 +97,14 @@ def plot_and_scale_page():
         # ==== 2. CCS PLOT WITH SHADING UNDER EACH CHARGE STATE ====
         st.subheader("Scaled Intensity vs CCS by Charge State")
         
-        # Calculate the standard deviation and mean for each CCS value
-        ccs_std_dev = cal_df.groupby("CCS")["Scaled Intensity"].std().reset_index(name="CCS Std.Dev.")
-        ccs_mean = cal_df.groupby("CCS")["Scaled Intensity"].mean().reset_index(name="CCS Mean")
-        
-        # Merge the std dev and mean data
-        ccs_data = pd.merge(ccs_mean, ccs_std_dev, on="CCS")
-
-        # Filter out rows where CCS Std.Dev. > CCS (we exclude rows where the standard deviation is greater than the CCS)
-        filtered_ccs = ccs_data[ccs_data["CCS Std.Dev."] < ccs_data["CCS"]]
+        # Filter out rows where CCS Std. Dev. >= CCS
+        filtered_cal_df = cal_df[cal_df["CCS Std. Dev."] < cal_df["CCS"]]
 
         # Plotting the CCS plot
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
         
         # Plot each charge state with semi-transparent shading
-        for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
+        for i, (charge, group) in enumerate(filtered_cal_df.groupby("Charge")):
             # Interpolating each charge state to 1 A2 resolution
             interpolated_ccs = np.arange(group["CCS"].min(), group["CCS"].max(), 1)
             interpolated_intensity = np.interp(interpolated_ccs, group["CCS"], group["Scaled Intensity"])
@@ -119,7 +112,7 @@ def plot_and_scale_page():
             ax2.fill_between(interpolated_ccs, 0, interpolated_intensity, color=palette[i], alpha=0.3)
 
         # Plot total intensity across all charges
-        total_df = cal_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
+        total_df = filtered_cal_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
         ax2.plot(total_df["CCS"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
 
         # Set axes labels and title
