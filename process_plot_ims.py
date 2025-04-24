@@ -54,12 +54,13 @@ def plot_and_scale_page():
         csv_output = cal_df.to_csv(index=False).encode("utf-8")
         st.download_button("Download Scaled CSV", data=csv_output, file_name="scaled_calibrated_data.csv", mime="text/csv")
 
-        # Plot config controls
-        st.subheader("Plot Options")
+        # Plot config controls for CCS plot only
+        st.subheader("CCS Plot Options")
         palette_choice = st.selectbox("Choose a color palette", sns.palettes.SEABORN_PALETTES.keys(), index=0)
-        fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
-        fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
-        fig_dpi = st.slider("Figure DPI", min_value=50, max_value=300, value=150)
+        fig_width = st.slider("Figure width (CCS plot)", min_value=4, max_value=20, value=10)
+        fig_height = st.slider("Figure height (CCS plot)", min_value=3, max_value=15, value=6)
+        fig_dpi = st.slider("Figure DPI (CCS plot)", min_value=50, max_value=300, value=150)
+        font_size = st.slider("Font size for CCS plot", min_value=8, max_value=20, value=12)
 
         palette = sns.color_palette(palette_choice, n_colors=len(unique_charges))
 
@@ -93,32 +94,41 @@ def plot_and_scale_page():
         
         st.pyplot(fig1)
 
-        # ==== 2. DRIFT TIME PLOT WITH SHADING UNDER EACH CHARGE STATE ====
-        st.subheader("Scaled Intensity vs Drift Time by Charge State")
+        # ==== 2. CCS PLOT WITH SHADING UNDER EACH CHARGE STATE ====
+        st.subheader("Scaled Intensity vs CCS by Charge State")
         
-        # Plotting
+        # Filter CCS data based on the standard deviation smaller than CCS value
+        ccs_std_dev = cal_df.groupby("CCS")["Scaled Intensity"].std().reset_index()
+        ccs_mean = cal_df.groupby("CCS")["Scaled Intensity"].mean().reset_index()
+        filtered_ccs = ccs_mean[ccs_std_dev["Scaled Intensity"] < ccs_mean["Scaled Intensity"]]
+
+        # Plotting the CCS plot
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
         
         # Plot each charge state with semi-transparent shading
         for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
-            ax2.plot(group["Drift"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
-            ax2.fill_between(group["Drift"], 0, group["Scaled Intensity"], color=palette[i], alpha=0.3)
+            # Interpolating each charge state to 1 A2 resolution
+            interpolated_ccs = np.arange(group["CCS"].min(), group["CCS"].max(), 1)
+            interpolated_intensity = np.interp(interpolated_ccs, group["CCS"], group["Scaled Intensity"])
+            ax2.plot(interpolated_ccs, interpolated_intensity, label=f"Charge {charge}", color=palette[i])
+            ax2.fill_between(interpolated_ccs, 0, interpolated_intensity, color=palette[i], alpha=0.3)
 
         # Plot total intensity across all charges
-        total_df = cal_df.groupby("Drift")["Scaled Intensity"].sum().reset_index()
-        ax2.plot(total_df["Drift"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
+        total_df = cal_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
+        ax2.plot(total_df["CCS"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
 
-        ax2.set_xlabel("CCS (s)")
-        ax2.set_ylabel("Scaled Intensity")
-        ax2.set_title("Scaled Intensity vs CCS by Charge State")
-        ax2.legend()
+        # Set axes labels and title
+        ax2.set_xlabel("CCS (s)", fontsize=font_size)
+        ax2.set_ylabel("", fontsize=font_size)  # No label for y-axis
+        ax2.set_title("Scaled Intensity vs CCS by Charge State", fontsize=font_size)
+        ax2.legend(fontsize=font_size)
         ax2.grid(False)
 
         # Add black border around plot area
         for spine in ax2.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
-        
+
         # Allow downloading the figure
         fig_buffer = BytesIO()
         fig2.savefig(fig_buffer, format='png', dpi=fig_dpi, bbox_inches="tight")
