@@ -20,8 +20,8 @@ def plot_and_scale_page():
     if cal_file and ms_file and protein_mass > 0:
         # Read calibrated drift data
         cal_df = pd.read_csv(cal_file)
-        if "Charge" not in cal_df.columns or "Intensity" not in cal_df.columns or "CCS" not in cal_df.columns or "CCS Std. Dev." not in cal_df.columns:
-            st.error("The CSV file must contain 'Charge', 'Intensity', 'CCS', and 'CCS Std. Dev.' columns.")
+        if "Charge" not in cal_df.columns or "Intensity" not in cal_df.columns or "CCS" not in cal_df.columns or "CCS Std.Dev." not in cal_df.columns:
+            st.error("The CSV file must contain 'Charge', 'Intensity', 'CCS', and 'CCS Std.Dev.' columns.")
             return
 
         # Read mass spectrum data
@@ -98,7 +98,7 @@ def plot_and_scale_page():
         st.subheader("Scaled Intensity vs CCS by Charge State")
         
         # Filter out rows where CCS Std. Dev. >= CCS
-        filtered_cal_df = cal_df[cal_df["CCS Std. Dev."] < cal_df["CCS"]]
+        filtered_cal_df = cal_df[cal_df["CCS Std.Dev."] < cal_df["CCS"]]
 
         # Plotting the CCS plot
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
