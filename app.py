@@ -1,3 +1,4 @@
+
 # app.py
 import streamlit as st
 from gaussian_fitting import upload_and_plot
@@ -60,4 +61,5 @@ elif page == "Calibrate CIU":
     twim_extract_page()
 
 elif page == "Process/Plot IMS":
+    st.title("Process/Plot IMS")
     plot_and_scale_page()
