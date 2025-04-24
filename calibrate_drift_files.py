@@ -76,6 +76,10 @@ def calibrate_drift_files_page():
                             # Adjust drift time for Cyclic data
                             if data_type == "Cyclic" and inject_time is not None:
                                 raw_df["Drift"] = raw_df["Drift"] - inject_time
+                            
+                            # Convert from ms to s for matching with calibration data
+                            raw_df["Drift"] = raw_df["Drift"] / 1000.0
+
 
                             # Match calibration drift times to intensities
                             out_rows = []
