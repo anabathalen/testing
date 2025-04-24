@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+from io import BytesIO
 
 def plot_and_scale_page():
     st.title("Plot and Scale Calibrated Data")
@@ -33,7 +34,7 @@ def plot_and_scale_page():
         # Get unique charge states from calibrated data
         unique_charges = sorted(cal_df["Charge"].unique())
 
-        # Calculate m/z for each charge state
+        # Calculate m/z for each charge state and integrate spectrum
         charge_scale_factors = {}
         for z in unique_charges:
             mz = (protein_mass + z * PROTON_MASS) / z
@@ -42,87 +43,76 @@ def plot_and_scale_page():
             intensity_sum = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]["Intensity"].sum()
             charge_scale_factors[z] = intensity_sum
 
-        # Add Scale Factor and Scaled Intensity to the DataFrame
+        # Add scale factor columns
         cal_df["Scale Factor"] = cal_df["Charge"].map(charge_scale_factors)
         cal_df["Scaled Intensity"] = cal_df["Intensity"] * cal_df["Scale Factor"]
 
-        # Show and allow download
+        # Show and download scaled data
         st.subheader("Scaled Calibrated Data")
         st.dataframe(cal_df)
 
         csv_output = cal_df.to_csv(index=False).encode("utf-8")
         st.download_button("Download Scaled CSV", data=csv_output, file_name="scaled_calibrated_data.csv", mime="text/csv")
 
-        # Plot config controls
+        # === Plot configuration ===
         st.subheader("Plot Options")
-        palette_choice = st.selectbox("Choose a color palette", sns.palettes.SEABORN_PALETTES.keys(), index=0)
+        palette_choice = st.selectbox("Choose a color palette", list(sns.palettes.SEABORN_PALETTES.keys()), index=0)
         fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
         fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
-        
+        fig_dpi = st.slider("Figure resolution (DPI)", min_value=72, max_value=600, value=150)
+
         palette = sns.color_palette(palette_choice, n_colors=len(unique_charges))
-        
-        # ==== 1. MASS SPECTRUM WITH INTEGRATION WINDOWS ====
+
+        # === 1. Mass Spectrum with Integration Windows ===
         st.subheader("Mass Spectrum with Charge State Integration Regions")
-        
-        fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height))
-        
-        # Plot raw spectrum
+
+        fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
         ax1.plot(ms_df["m/z"], ms_df["Intensity"], color="gray", label="Mass Spectrum")
-        
-        # Highlight integration regions for each charge state
+
         for i, z in enumerate(unique_charges):
             mz = (protein_mass + z * PROTON_MASS) / z
             mz_min = mz * 0.99
             mz_max = mz * 1.01
-            color = palette[i]
-        
             region = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]
-            ax1.fill_between(region["m/z"], region["Intensity"], color=color, alpha=0.5, label=f"Charge {z} window")
-        
+            ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.5, label=f"Charge {z} window")
+
         ax1.set_xlabel("m/z")
         ax1.set_ylabel("Intensity")
         ax1.set_title("Mass Spectrum with Integration Windows")
         ax1.legend()
         ax1.grid(True)
-        
-        # Black border
         for spine in ax1.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
-        
-st.pyplot(fig1)
+        st.pyplot(fig1)
 
-        
-        # Add color palette selection
-        st.subheader("Plot Options")
-        palette_choice = st.selectbox("Choose a color palette", sns.palettes.SEABORN_PALETTES.keys(), index=0)
-        fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
-        fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
-        
-        # Plotting
-        palette = sns.color_palette(palette_choice, n_colors=cal_df["Charge"].nunique())
-        
-        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
-        
-        # Plot each charge state
+        # === 2. Drift Time Plot ===
+        st.subheader("Drift Time Plot by Charge State")
+
+        fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
+
         for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
-            ax.plot(group["Drift"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
-        
-        # Plot total intensity across all charges
+            ax2.plot(group["Drift"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
+
         total_df = cal_df.groupby("Drift")["Scaled Intensity"].sum().reset_index()
-        ax.plot(total_df["Drift"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
-        
-        # Styling
-        ax.set_xlabel("Drift Time (s)")
-        ax.set_ylabel("Scaled Intensity")
-        ax.set_title("Scaled Intensity vs Drift Time by Charge State")
-        ax.legend()
-        ax.grid(True)
-        
-        # Add black border around plot area
-        for spine in ax.spines.values():
+        ax2.plot(total_df["Drift"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
+
+        ax2.set_xlabel("Drift Time (s)")
+        ax2.set_ylabel("Scaled Intensity")
+        ax2.set_title("Scaled Intensity vs Drift Time")
+        ax2.legend()
+        ax2.grid(True)
+        for spine in ax2.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
-        
-        st.pyplot(fig)
+        st.pyplot(fig2)
 
+        # === Download Plot as PNG ===
+        buf = BytesIO()
+        fig2.savefig(buf, format="png", dpi=fig_dpi, bbox_inches="tight")
+        st.download_button(
+            label="Download Drift Plot as PNG",
+            data=buf.getvalue(),
+            file_name="drift_plot.png",
+            mime="image/png"
+        )
