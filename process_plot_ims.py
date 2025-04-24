@@ -64,7 +64,7 @@ def plot_and_scale_page():
 
         palette = sns.color_palette(palette_choice, n_colors=len(unique_charges))
 
-        # ==== 1. MASS SPECTRUM WITH INTEGRATION BARS ====
+        # ==== 1. MASS SPECTRUM WITH INTEGRATION BARS ==== 
         st.subheader("Mass Spectrum with Charge State Integration Regions")
         
         fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height))
@@ -94,7 +94,7 @@ def plot_and_scale_page():
         
         st.pyplot(fig1)
 
-        # ==== 2. CCS PLOT WITH SHADING UNDER EACH CHARGE STATE ====
+        # ==== 2. CCS PLOT WITH SHADING UNDER EACH CHARGE STATE ==== 
         st.subheader("Scaled Intensity vs CCS by Charge State")
         
         # Filter out rows where CCS Std. Dev. >= CCS
@@ -103,9 +103,9 @@ def plot_and_scale_page():
         # Plotting the CCS plot
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height))
         
-        # Plot each charge state with semi-transparent shading
+        # Interpolate and sum intensities for each charge state at 1 Å² intervals
         for i, (charge, group) in enumerate(filtered_cal_df.groupby("Charge")):
-            # Interpolating each charge state to 1 A2 resolution
+            # Interpolating each charge state to 1 Å² resolution
             interpolated_ccs = np.arange(group["CCS"].min(), group["CCS"].max(), 1)
             interpolated_intensity = np.interp(interpolated_ccs, group["CCS"], group["Scaled Intensity"])
             ax2.plot(interpolated_ccs, interpolated_intensity, label=f"Charge {charge}", color=palette[i])
@@ -116,12 +116,15 @@ def plot_and_scale_page():
         ax2.plot(total_df["CCS"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
 
         # Set axes labels and title
-        ax2.set_xlabel("CCS (s)", fontsize=font_size)
-        ax2.set_ylabel("", fontsize=font_size)  # No label for y-axis
+        ax2.set_xlabel("CCS (Å²)", fontsize=font_size)
+        ax2.set_ylabel("")  # Remove y-axis label
         ax2.set_title("Scaled Intensity vs CCS by Charge State", fontsize=font_size)
         ax2.legend(fontsize=font_size)
         ax2.grid(False)
 
+        # Remove y-axis ticks and numbers
+        ax2.set_yticklabels([])
+        
         # Add black border around plot area
         for spine in ax2.spines.values():
             spine.set_edgecolor("black")
@@ -133,6 +136,9 @@ def plot_and_scale_page():
         fig_buffer.seek(0)
         
         st.download_button("Download CCS Plot as PNG", data=fig_buffer, file_name="ccs_plot.png", mime="image/png")
+
+        st.pyplot(fig2)
+
 
         st.pyplot(fig2)
 
