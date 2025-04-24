@@ -97,19 +97,21 @@ def plot_and_scale_page():
         
         # === 2. CCS Plot by Charge State ===
         st.subheader("Scaled Intensity vs CCS by Charge State")
-        
+        # Filter data: Only include rows where CCS Std.Dev. < CCS
+        filtered_df = cal_df[cal_df["CCS Std.Dev."] < cal_df["CCS"]]
+
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
-        
-        for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
+
+        for i, (charge, group) in enumerate(filtered_df.groupby("Charge")):
             ax2.plot(group["CCS"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
         
-        total_df = cal_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
+        total_df = filtered_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
         ax2.plot(total_df["CCS"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
         
         ax2.set_xlabel("CCS (Å²)")
         ax2.set_title("Scaled Intensity vs CCS")
         ax2.set_yticks([])
-        ax2.set_ylabel("")  # remove y-axis label
+        ax2.set_ylabel("")  # Remove y-axis label
         ax2.yaxis.set_ticklabels([])
         ax2.grid(False)
         
