@@ -97,24 +97,24 @@ def plot_and_scale_page():
 
             total_trace = np.sum(interpolated_traces, axis=0)
             ax2.plot(ccs_grid, total_trace, color="black", linewidth=2.0, label="Total (Interpolated)")
+            ax2.legend(fontsize=font_size)
 
         elif plot_mode == "Stacked":
             vertical_offset = 1.2
             for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
                 group_sorted = group.sort_values("CCS")
                 interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted["Scaled Intensity"], left=0, right=0)
-                if interp.max() > 0:
-                    norm_interp = interp / interp.max()
-                else:
-                    norm_interp = interp
+                norm_interp = interp / interp.max() if interp.max() > 0 else interp
                 offset_interp = norm_interp + i * vertical_offset
                 ax2.plot(ccs_grid, offset_interp, color=palette[i])
                 ax2.fill_between(ccs_grid, i * vertical_offset, offset_interp, color=palette[i], alpha=0.3)
-                label_x = ccs_grid[-1] + (ccs_max - ccs_min) * 0.01
-                label_y = i * vertical_offset + 0.5
-                ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size, verticalalignment="center")
 
-            ax2.set_xlim(ccs_min, ccs_max + (ccs_max - ccs_min) * 0.05)
+                label_x = ccs_grid[0]
+                label_y = i * vertical_offset
+                ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
+                         verticalalignment="bottom", color=palette[i])
+
+            ax2.set_xlim(ccs_min, ccs_max + (ccs_max - ccs_min) * 0.1)
 
         ax2.set_xlabel("CCS (Å²)", fontsize=font_size)
         ax2.set_yticks([])
@@ -134,4 +134,3 @@ def plot_and_scale_page():
         fig2.savefig(fig_buffer, format='png', dpi=fig_dpi, bbox_inches='tight')
         fig_buffer.seek(0)
         st.download_button("Download CCS Plot as PNG", data=fig_buffer, file_name="ccs_plot.png", mime="image/png", key="ccs_download")
-
