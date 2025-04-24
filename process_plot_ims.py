@@ -65,54 +65,66 @@ def plot_and_scale_page():
 
         # === 1. Mass Spectrum with Integration Windows ===
         st.subheader("Mass Spectrum with Charge State Integration Regions")
-
+        
         fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
-        ax1.plot(ms_df["m/z"], ms_df["Intensity"], color="gray", label="Mass Spectrum")
-
+        ax1.plot(ms_df["m/z"], ms_df["Intensity"], color="gray", linewidth=1.5, label="Mass Spectrum")
+        
         for i, z in enumerate(unique_charges):
             mz = (protein_mass + z * PROTON_MASS) / z
             mz_min = mz * 0.99
             mz_max = mz * 1.01
             region = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]
-            ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.5, label=f"Charge {z} window")
-
+            
+            # Make region visible even if empty
+            if not region.empty:
+                ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.7, label=f"Charge {z} window", linewidth=0)
+                ax1.axvline(mz_min, color=palette[i], linestyle="--", linewidth=1)
+                ax1.axvline(mz_max, color=palette[i], linestyle="--", linewidth=1)
+        
         ax1.set_xlabel("m/z")
-        ax1.set_ylabel("Intensity")
-        ax1.set_title("Mass Spectrum with Integration Windows")
+        ax1.set_title("Mass Spectrum with Integration Regions")
         ax1.legend()
-        ax1.grid(True)
+        ax1.set_yticks([])
+        ax1.set_ylabel("")  # remove y-axis label
+        ax1.yaxis.set_ticklabels([])  # ensure tick labels are gone
+        ax1.grid(False)
+        
         for spine in ax1.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
+        
         st.pyplot(fig1)
-
-        # === 2. Drift Time Plot ===
-        st.subheader("Drift Time Plot by Charge State")
-
+        
+        # === 2. CCS Plot by Charge State ===
+        st.subheader("Scaled Intensity vs CCS by Charge State")
+        
         fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
-
+        
         for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
-            ax2.plot(group["Drift"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
-
-        total_df = cal_df.groupby("Drift")["Scaled Intensity"].sum().reset_index()
-        ax2.plot(total_df["Drift"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
-
-        ax2.set_xlabel("Drift Time (s)")
-        ax2.set_ylabel("Scaled Intensity")
-        ax2.set_title("Scaled Intensity vs Drift Time")
-        ax2.legend()
-        ax2.grid(True)
+            ax2.plot(group["CCS"], group["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
+        
+        total_df = cal_df.groupby("CCS")["Scaled Intensity"].sum().reset_index()
+        ax2.plot(total_df["CCS"], total_df["Scaled Intensity"], color="black", linewidth=2.0, label="Total")
+        
+        ax2.set_xlabel("CCS (Å²)")
+        ax2.set_title("Scaled Intensity vs CCS")
+        ax2.set_yticks([])
+        ax2.set_ylabel("")  # remove y-axis label
+        ax2.yaxis.set_ticklabels([])
+        ax2.grid(False)
+        
         for spine in ax2.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
+        
         st.pyplot(fig2)
-
+        
         # === Download Plot as PNG ===
         buf = BytesIO()
         fig2.savefig(buf, format="png", dpi=fig_dpi, bbox_inches="tight")
         st.download_button(
-            label="Download Drift Plot as PNG",
+            label="Download CCS Plot as PNG",
             data=buf.getvalue(),
-            file_name="drift_plot.png",
+            file_name="ccs_plot.png",
             mime="image/png"
         )
