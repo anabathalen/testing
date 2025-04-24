@@ -89,7 +89,9 @@ def plot_and_scale_page():
             group_sorted = group.sort_values("CCS")
             interp_intensity = np.interp(ccs_grid, group_sorted["CCS"], group_sorted["Scaled Intensity"], left=0, right=0)
             interpolated_traces.append(interp_intensity)
-            ax2.plot(group_sorted["CCS"], group_sorted["Scaled Intensity"], label=f"Charge {charge}", color=palette[i])
+            ax2.plot(ccs_grid, interp_intensity, label=f"Charge {charge}", color=palette[i])
+            ax2.fill_between(ccs_grid, interp_intensity, color=palette[i], alpha=0.3)  # semi-transparent shading
+
 
         total_trace = np.sum(interpolated_traces, axis=0)
         ax2.plot(ccs_grid, total_trace, color="black", linewidth=2.0, label="Total (Interpolated)")
