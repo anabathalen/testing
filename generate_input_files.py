@@ -77,7 +77,6 @@ def generate_output_zip(sample_folders_paths):
 
 # Main Streamlit app
 def generate_input_dat_files_app():
-    st.title("Generate Sample Input .dat Files")
 
     uploaded_zip_file = st.file_uploader("Upload ZIP containing sample protein folders", type="zip")
 
