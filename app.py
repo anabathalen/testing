@@ -53,7 +53,9 @@ elif page == "Generate Input Files":
 
 # Process Outputs Page
 elif page == "Process Outputs":
-    st.title("Process Output Files")
+    st.title("Process Output Files (from IMSCal)")
+    st.subheader("Combine IMSCal Outputs to Single CSV Per Protein.")
+    st.markdown('''IMSCal will have populated your protein folders containing input files with corresponding calibrated output files for each charge state - this tool will compile all that information into one csv file per protein. The csv files you generate here allow you to calibrate any other ATDs obtained on the same day for the same protein, which will be useful e.g. for aIMS.''')
     process_outputs_page()
 
 elif page == "Calibrate Drift Files":
