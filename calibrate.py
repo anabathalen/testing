@@ -74,7 +74,7 @@ def process_folder_data(folder_name, base_path, bush_df, calibrant_type):
     plots = []
 
     # Determine the column for the selected calibrant type
-    calibrant_column = 'CCS_he' if calibrant_type == 'He' else 'CCS_n2'
+    calibrant_column = 'CCS_he' if calibrant_type == 'Helium' else 'CCS_n2'
 
     # Iterate through each file in the folder
     for filename in os.listdir(folder_path):
@@ -152,17 +152,19 @@ def calibrate_page():
         # Step 2: Read bush.csv for calibrant data
         bush_df = read_bush_csv()
 
+        st.markdown('''Most of the time you should calibrate with calibrant values obtained for the same drift gas as you used in your experiment, but sometimes you might not so the option is here.''')
+        
         # Step 3: Dropdown for selecting calibrant type (He or N2)
-        calibrant_type = st.selectbox("Select Calibrant Type", options=["He", "N2"])
+        calibrant_type = st.selectbox("Which values from the Bush database would you like to calibrate with?", options=["Helium", "Nitrogen"])
 
         # Step 4: Get user inputs for parameters
-        velocity = st.number_input("Enter velocity", min_value=0.0, value=281.0)
-        voltage = st.number_input("Enter voltage", min_value=0.0, value=20.0)
-        pressure = st.number_input("Enter pressure", min_value=0.0, value=1.63)
-        length = st.number_input("Enter length", min_value=0.0, value=0.980)
+        velocity = st.number_input("Enter wave velocity (m/s, multiplied by 0.75 if this is Cyclic data)", min_value=0.0, value=281.0)
+        voltage = st.number_input("Enter wave height (V)", min_value=0.0, value=20.0)
+        pressure = st.number_input("Enter IMS pressure", min_value=0.0, value=1.63)
+        length = st.number_input("Enter drift cell length (0.25m for Synapt, 0.98m for Cyclic)", min_value=0.0, value=0.980)
 
         # Step 4.5: Ask for data type
-        data_type = st.radio("Is your data Cyclic or Synapt?", options=["Cyclic", "Synapt"])
+        data_type = st.radio("Is this Cyclic or Synapt data?", options=["Cyclic", "Synapt"])
         inject_time = 0.0
         if data_type.lower() == "cyclic":
             inject_time = st.number_input("Enter inject time (ms)", min_value=0.0, value=0.0)
