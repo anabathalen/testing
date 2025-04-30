@@ -79,7 +79,7 @@ def generate_output_zip(sample_folders_paths):
 def generate_input_dat_files_app():
     st.title("Generate Sample Input .dat Files")
 
-    uploaded_zip_file = st.file_uploader("Upload ZIP containing sample folders", type="zip")
+    uploaded_zip_file = st.file_uploader("Upload ZIP containing sample protein folders", type="zip")
 
     if uploaded_zip_file is not None:
         sample_folders, base_path = handle_zip_upload(uploaded_zip_file)
@@ -91,12 +91,12 @@ def generate_input_dat_files_app():
 
         all_sample_paths = []
 
-        st.subheader("Input Mass for Each Sample")
+        st.subheader("Input Masses (Da) for Each Sample Protein")
 
         with st.form("sample_mass_form"):
             sample_mass_map = {}
             for sample in sample_folders:
-                mass = st.number_input(f"Mass for sample '{sample}'", min_value=0.0, key=sample)
+                mass = st.number_input(f"Mass of '{sample}'", min_value=0.0, key=sample)
                 sample_mass_map[sample] = mass
             submitted = st.form_submit_button("Generate .dat Files")
 
