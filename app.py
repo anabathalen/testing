@@ -46,7 +46,9 @@ elif page == "Calibrate":
 
 # Generate Input Files Page
 elif page == "Generate Input Files":
-    st.title("Get Input Files")
+    st.title("Get Input Files (for IMSCal)")
+    st.subheader("Takes ATDs of Samples and Returns Input Files for IMSCal.")
+    st.markdown('''Make a zipped folder (like you did for the calibration) containing a folder for each protein titled the name of the protein. Each folder should contain text files called x.txt where x is the charge state.''')
     generate_input_dat_files_app()
 
 # Process Outputs Page
