@@ -83,7 +83,7 @@ def generate_input_dat_files_app():
     if uploaded_zip_file is not None:
         sample_folders, base_path = handle_zip_upload(uploaded_zip_file)
 
-        drift_mode = st.radio("What type of data is this?", options=["Cyclic", "Synaptic"])
+        drift_mode = st.radio("Which instrument did you use?", options=["Cyclic", "Synapt"])
         inject_time = None
         if drift_mode == "Cyclic":
             inject_time = st.number_input("Enter inject time to subtract (ms)", min_value=0.0, value=12.0)
