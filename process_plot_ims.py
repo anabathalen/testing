@@ -107,10 +107,16 @@ def plot_and_scale_page():
 
         ax.set_xlim(ccs_range)
         ax.set_xlabel("CCS (Å²)", fontsize=font_size)
-        ax.set_yticks([] if plot_mode == "Stacked" else None)
-        ax.set_ylabel("" if plot_mode == "Stacked" else "Intensity", fontsize=font_size)
+        
+        if plot_mode == "Stacked":
+            ax.set_yticks([])
+            ax.set_ylabel("")
+        else:
+            ax.set_ylabel("Intensity", fontsize=font_size)
+        
         ax.set_title("Scaled Intensity vs CCS", fontsize=font_size)
         ax.grid(False)
+
 
         for label in ax.get_xticklabels():
             label.set_fontsize(font_size)
