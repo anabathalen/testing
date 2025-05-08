@@ -51,7 +51,7 @@ def plot_and_scale_page():
         # === Plot Controls ===
         st.subheader("Plot Options")
         palette_choice = st.selectbox("Color palette", list(sns.palettes.SEABORN_PALETTES.keys()))
-        fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
+        fig_width = st.slider("Figure width", min_value=3, max_value=20, value=10)
         fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
         fig_dpi = st.slider("Figure DPI (resolution)", min_value=100, max_value=1000, value=300)
         font_size = st.slider("Font size", min_value=5, max_value=24, value=12)
