@@ -53,9 +53,9 @@ def plot_and_scale_page():
         # === Plot Controls ===
         st.subheader("Plot Options")
         palette_choice = st.selectbox("Choose a color palette", list(sns.palettes.SEABORN_PALETTES.keys()))
-        fig_width = st.slider("Figure width", 4, 20, 10)
-        fig_height = st.slider("Figure height", 3, 15, 6)
-        fig_dpi = st.slider("Figure DPI", 72, 300, 100)
+        fig_width = st.slider("Figure width", 2, 20, 10)
+        fig_height = st.slider("Figure height", 2, 20, 10)
+        fig_dpi = st.slider("Figure DPI", 100, 1000, 300)
         font_size = st.slider("Font size", 8, 24, 12)
         plot_mode = st.radio("Display Mode", ["Summed", "Stacked"])
 
@@ -109,7 +109,7 @@ def plot_and_scale_page():
                 ax.plot(ccs_grid, offset_interp, color=palette[i])
                 ax.fill_between(ccs_grid, i * vertical_offset, offset_interp, color=palette[i], alpha=0.3)
                 # Shifted label
-                label_x = ccs_grid[0] + 20  # right shift
+                label_x = ccs_grid[0] + 100  # right shift
                 label_y = i * vertical_offset + 0.1  # slight raise
                 ax.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size, color=palette[i], va="bottom")
 
