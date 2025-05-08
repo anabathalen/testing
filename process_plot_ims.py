@@ -6,13 +6,6 @@ import seaborn as sns
 from io import BytesIO
 
 
-import streamlit as st
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from io import BytesIO
-
 def plot_and_scale_page():
     st.title("Plot and Scale Calibrated Data")
 
@@ -47,19 +40,23 @@ def plot_and_scale_page():
         cal_df["Scale Factor"] = cal_df["Charge"].map(scale_factors)
         cal_df["Scaled Intensity"] = cal_df["Intensity"] * cal_df["Scale Factor"]
 
-        st.subheader("Scaled Calibrated Data")
+        # === Let user choose scaled vs unscaled ===
+        use_scaled = st.radio("Use Scaled or Unscaled Intensities?", ["Scaled", "Unscaled"], index=0)
+        intensity_column = "Scaled Intensity" if use_scaled == "Scaled" else "Intensity"
+
+        st.subheader("Data Preview")
         st.dataframe(cal_df)
 
         csv_output = cal_df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download Scaled CSV", data=csv_output, file_name="scaled_calibrated_data.csv", mime="text/csv", key="csv_download")
+        st.download_button("Download CSV", data=csv_output, file_name="calibrated_data.csv", mime="text/csv")
 
         # === Plot Controls ===
         st.subheader("Plot Options")
         palette_choice = st.selectbox("Choose a color palette", list(sns.palettes.SEABORN_PALETTES.keys()))
-        fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
-        fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
-        fig_dpi = st.slider("Figure DPI", min_value=72, max_value=300, value=100)
-        font_size = st.slider("Font size", min_value=8, max_value=24, value=12)
+        fig_width = st.slider("Figure width", 4, 20, 10)
+        fig_height = st.slider("Figure height", 3, 15, 6)
+        fig_dpi = st.slider("Figure DPI", 72, 300, 100)
+        font_size = st.slider("Font size", 8, 24, 12)
         plot_mode = st.radio("Display Mode", ["Summed", "Stacked"])
 
         # === Additional Plot Settings ===
@@ -70,94 +67,77 @@ def plot_and_scale_page():
             format_func=lambda x: f"{x}+"
         )
 
-        ccs_range_col1, ccs_range_col2 = st.columns(2)
-        with ccs_range_col1:
+        col1, col2 = st.columns(2)
+        with col1:
             x_min = st.number_input("CCS x-axis min (Å²)", value=float(np.floor(cal_df["CCS"].min())))
-        with ccs_range_col2:
+        with col2:
             x_max = st.number_input("CCS x-axis max (Å²)", value=float(np.ceil(cal_df["CCS"].max())))
 
-        ref_line_value = st.number_input("Reference CCS value (Å²) to annotate", value=0.0, help="Set to 0 to hide line")
+        ref_line_value = st.number_input("Reference CCS value (Å²)", value=0.0)
         ref_line_label = st.text_input("Reference label (e.g., AlphaFold2)", value="AlphaFold2")
 
         palette = sns.color_palette(palette_choice, n_colors=len(unique_charges))
 
-        # === Mass Spectrum Plot ===
-        st.subheader("Mass Spectrum with Charge State Integration Regions")
-        fig1, ax1 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
-        ax1.plot(ms_df["m/z"], ms_df["Intensity"], color="gray", label="Mass Spectrum")
-
-        for i, z in enumerate(unique_charges):
-            mz = (protein_mass + z * PROTON_MASS) / z
-            mz_min = mz * 0.99
-            mz_max = mz * 1.01
-            region = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]
-            ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.5, label=f"{z}+")
-
-        ax1.set_xlabel("m/z", fontsize=font_size)
-        ax1.set_ylabel("Intensity", fontsize=font_size)
-        ax1.set_title("Mass Spectrum with Integration Windows", fontsize=font_size)
-        ax1.legend(fontsize=font_size)
-        for label in (ax1.get_xticklabels() + ax1.get_yticklabels()):
-            label.set_fontsize(font_size)
-        for spine in ax1.spines.values():
-            spine.set_edgecolor("black")
-            spine.set_linewidth(1.5)
-        st.pyplot(fig1)
-
         # === CCS Plot ===
         st.subheader("Scaled Intensity vs CCS")
         ccs_grid = np.arange(x_min, x_max + 1, 1.0)
-        fig2, ax2 = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
-        interpolated_traces = []
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height), dpi=fig_dpi)
 
+        interpolated_traces = []
         filtered_df = cal_df[cal_df["Charge"].isin(selected_charges)]
         charges_to_plot = sorted(filtered_df["Charge"].unique())
 
         if plot_mode == "Summed":
             for i, (charge, group) in enumerate(filtered_df.groupby("Charge")):
                 group_sorted = group.sort_values("CCS")
-                interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted["Scaled Intensity"], left=0, right=0)
+                interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted[intensity_column], left=0, right=0)
                 interpolated_traces.append(interp)
-                ax2.plot(ccs_grid, interp, color=palette[i], label=f"{int(charge)}+")
-                ax2.fill_between(ccs_grid, 0, interp, color=palette[i], alpha=0.3)
+                ax.plot(ccs_grid, interp, color=palette[i], label=f"{int(charge)}+")
+                ax.fill_between(ccs_grid, 0, interp, color=palette[i], alpha=0.3)
 
             total_trace = np.sum(interpolated_traces, axis=0)
-            ax2.plot(ccs_grid, total_trace, color="black", linewidth=2.0, label="Total (Interpolated)")
-            ax2.legend(fontsize=font_size)
+            ax.plot(ccs_grid, total_trace, color="black", linewidth=2.0, label="Total (Interpolated)")
+            ax.legend(fontsize=font_size)
 
         elif plot_mode == "Stacked":
             vertical_offset = 1.2
             for i, (charge, group) in enumerate(filtered_df.groupby("Charge")):
                 group_sorted = group.sort_values("CCS")
-                interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted["Scaled Intensity"], left=0, right=0)
+                interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted[intensity_column], left=0, right=0)
                 norm_interp = interp / interp.max() if interp.max() > 0 else interp
                 offset_interp = norm_interp + i * vertical_offset
-                ax2.plot(ccs_grid, offset_interp, color=palette[i])
-                ax2.fill_between(ccs_grid, i * vertical_offset, offset_interp, color=palette[i], alpha=0.3)
-                ax2.text(ccs_grid[0], i * vertical_offset, f"{int(charge)}+",
-                         fontsize=font_size, verticalalignment="bottom", color=palette[i])
+                ax.plot(ccs_grid, offset_interp, color=palette[i])
+                ax.fill_between(ccs_grid, i * vertical_offset, offset_interp, color=palette[i], alpha=0.3)
+                # Shifted label
+                label_x = ccs_grid[0] + 20  # right shift
+                label_y = i * vertical_offset + 0.1  # slight raise
+                ax.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size, color=palette[i], va="bottom")
 
-        # Reference line
+        # Reference Line
         if ref_line_value > 0:
-            ax2.axvline(ref_line_value, color='red', linestyle='--', linewidth=2)
-            ax2.text(ref_line_value, ax2.get_ylim()[1], ref_line_label,
-                     color='red', fontsize=font_size, rotation=90, verticalalignment='top')
+            ax.axvline(ref_line_value, color='black', linestyle='--', linewidth=1.2)
+            ax.text(ref_line_value - 5, ax.get_ylim()[1], ref_line_label,
+                    color='black', fontsize=font_size, rotation=90,
+                    verticalalignment='top', horizontalalignment='right')
 
-        ax2.set_xlim(x_min, x_max)
-        ax2.set_xlabel("CCS (Å²)", fontsize=font_size)
-        ax2.set_yticks([])
-        ax2.set_ylabel("")
-        ax2.set_title("Scaled Intensity vs CCS", fontsize=font_size)
-        ax2.grid(False)
-        for label in ax2.get_xticklabels():
+        ax.set_xlim(x_min, x_max)
+        ax.set_xlabel("CCS (Å²)", fontsize=font_size)
+        ax.set_yticks([])
+        ax.set_ylabel("")
+        ax.set_title("Scaled Intensity vs CCS", fontsize=font_size)
+        ax.grid(False)
+
+        for label in ax.get_xticklabels():
             label.set_fontsize(font_size)
-        for spine in ax2.spines.values():
+        for spine in ax.spines.values():
             spine.set_edgecolor("black")
             spine.set_linewidth(1.5)
-        st.pyplot(fig2)
+
+        st.pyplot(fig)
 
         # Download PNG
         fig_buffer = BytesIO()
-        fig2.savefig(fig_buffer, format='png', dpi=fig_dpi, bbox_inches='tight')
+        fig.savefig(fig_buffer, format='png', dpi=fig_dpi, bbox_inches='tight')
         fig_buffer.seek(0)
-        st.download_button("Download CCS Plot as PNG", data=fig_buffer, file_name="ccs_plot.png", mime="image/png", key="ccs_download")
+        st.download_button("Download CCS Plot as PNG", data=fig_buffer, file_name="ccs_plot.png", mime="image/png")
+
