@@ -85,7 +85,7 @@ def plot_and_scale_page():
                 ax.fill_between(ccs_grid, 0, interp, color=palette[i], alpha=0.3)
 
             total_trace = np.sum(interpolated_traces, axis=0)
-            ax.plot(ccs_grid, total_trace, color="black", linewidth=line_thickness, label="Total (Interpolated)")
+            ax.plot(ccs_grid, total_trace, color="black", linewidth=line_thickness, label="Summed")
             ax.legend(fontsize=font_size, frameon=False)
 
         elif plot_mode == "Stacked":
@@ -109,9 +109,6 @@ def plot_and_scale_page():
         ax.set_xlabel("CCS (Å²)", fontsize=font_size)
         ax.set_yticks([])
         ax.set_ylabel("")
-
-        
-        ax.set_title("Scaled Intensity vs CCS", fontsize=font_size)
         ax.grid(False)
 
 
