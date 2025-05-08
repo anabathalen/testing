@@ -121,7 +121,7 @@ def plot_and_scale_page():
                 ax2.plot(ccs_grid, offset_interp, color="black", linewidth=line_thickness)
                 ax2.fill_between(ccs_grid, i * vertical_offset, offset_interp, color=palette[i], alpha=0.4)
 
-                label_x = ccs_grid[0] + 1
+                label_x = ccs_grid[0] + 100
                 label_y = i * vertical_offset + 0.1
                 ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
                          verticalalignment="bottom", horizontalalignment="left", color=palette[i])
