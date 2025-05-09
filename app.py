@@ -8,10 +8,12 @@ from process_outputs import process_outputs_page
 from calibrate_drift_files import calibrate_drift_files_page
 from calibrate_aims_from_twimextract import twim_extract_page
 from process_plot_ims import plot_and_scale_page
+from fit_ccs_traces import fit_ccs_traces_page
+
 
 # Sidebar for navigation
 st.sidebar.title("Navigation")
-page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files", "Calibrate CIU", "Process/Plot IMS"])
+page = st.sidebar.radio("Go to", ["Home", "Fit Gaussians to Data", "Fit CCS Traces", "Calibrate", "Generate Input Files", "Process Outputs", "Calibrate Drift Files", "Calibrate CIU", "Process/Plot IMS"])
 
 # Check if the page has changed, to ensure no redundant loading
 if "page" not in st.session_state or st.session_state["page"] != page:
@@ -67,3 +69,7 @@ elif page == "Calibrate CIU":
 elif page == "Process/Plot IMS":
     st.title("Process/Plot IMS")
     plot_and_scale_page()
+    
+elif page == "Fit CCS Traces":
+    fit_ccs_traces_page()
+
