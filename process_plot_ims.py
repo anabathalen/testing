@@ -51,7 +51,7 @@ def plot_and_scale_page():
         fig_height = st.slider("Figure height", min_value=2, max_value=20, value=4)
         fig_dpi = st.slider("Figure DPI", min_value=100, max_value=1000, value=300)
         font_size = st.slider("Font size", min_value=5, max_value=24, value=12)
-        line_thickness = st.slider("Line thickness", min_value=0.1, max_value=5.0, value=1, step=0.1)
+        line_thickness = st.slider("Line thickness", min_value=0.1, max_value=5.0, value=1.0, step=0.1)
         plot_mode = st.radio("Display Mode", ["Summed", "Stacked"])
         use_scaled = st.radio("Use Scaled or Unscaled Intensities?", ["Scaled", "Unscaled"]) == "Scaled"
 
@@ -106,7 +106,7 @@ def plot_and_scale_page():
                 max_y_value = max(max_y_value, interp.max())
 
             total_trace = np.sum(interpolated_traces, axis=0)
-            ax2.plot(ccs_grid, total_trace, color="black", linewidth=line_thickness + 0.5, label="Total (Interpolated)")
+            ax2.plot(ccs_grid, total_trace, color="black", linewidth=line_thickness, label="Total (Interpolated)")
             ax2.legend(fontsize=font_size, frameon=False)
 
         elif plot_mode == "Stacked":
