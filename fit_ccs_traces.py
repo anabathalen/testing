@@ -1,89 +1,82 @@
-# fit_ccs_traces.py
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 from scipy.stats import norm
+import matplotlib.pyplot as plt
 
 def gaussian(x, mean, std, amplitude):
     return amplitude * norm.pdf(x, mean, std)
 
+def sum_of_gaussians(x, *params):
+    n = len(params) // 3
+    y = np.zeros_like(x)
+    for i in range(n):
+        m, s, a = params[i*3:i*3+3]
+        y += gaussian(x, m, s, a)
+    return y
+
 def fit_ccs_traces_page():
-    st.title("Fit CCS Traces with Custom Gaussians")
+    st.title("Fit CCS Traces with Gaussian Models")
+    st.markdown("Upload a CSV with columns: `CCS`, `Intensity`, and optionally `Charge`. You can fit all data summed or each charge state separately.")
 
-    uploaded_file = st.file_uploader("Upload a CSV with columns: CCS, Intensity, Charge", type="csv")
+    uploaded_file = st.file_uploader("Upload CSV", type=["csv"])
+    if uploaded_file is None:
+        return
 
-    if uploaded_file:
-        df = pd.read_csv(uploaded_file)
-        if not {"CCS", "Intensity", "Charge"}.issubset(df.columns):
-            st.error("Your file must contain 'CCS', 'Intensity', and 'Charge' columns.")
-            return
+    df = pd.read_csv(uploaded_file)
+    if not {"CCS", "Intensity"}.issubset(df.columns):
+        st.error("CSV must contain 'CCS' and 'Intensity' columns.")
+        return
 
-        df = df.dropna(subset=["CCS", "Intensity", "Charge"])
-        charges = sorted(df["Charge"].unique())
+    fit_mode = st.radio("Choose fitting mode", ["Fit Summed Trace", "Fit Each Charge Separately"])
 
-        fit_mode = st.radio("Choose fit mode:", ["Sum first, then fit", "Fit individual charge states, then sum"])
+    x_min, x_max = st.slider("Select x-axis range (CCS)", float(df["CCS"].min()), float(df["CCS"].max()), (float(df["CCS"].min()), float(df["CCS"].max())))
 
-        # User-defined x range
-        st.subheader("Define X-axis (CCS) Range")
-        default_min = float(df["CCS"].min())
-        default_max = float(df["CCS"].max())
-        x_min = float(st.text_input("Minimum CCS (x-axis)", value=str(round(default_min, 2))))
-        x_max = float(st.text_input("Maximum CCS (x-axis)", value=str(round(default_max, 2))))
-        if x_min >= x_max:
-            st.error("Minimum CCS must be less than maximum CCS.")
-            return
+    x_fit = np.linspace(x_min, x_max, 1000)
 
-        ccs_grid = np.linspace(x_min, x_max, 1000)
-        interpolated = {}
+    if fit_mode == "Fit Each Charge Separately" and "Charge" not in df.columns:
+        st.warning("No 'Charge' column found. Defaulting to summed trace.")
+        fit_mode = "Fit Summed Trace"
 
-        for charge, group in df.groupby("Charge"):
-            group_sorted = group.sort_values("CCS")
-            interp = np.interp(ccs_grid, group_sorted["CCS"], group_sorted["Intensity"], left=0, right=0)
-            interpolated[charge] = interp
+    data_groups = [("Summed", df)] if fit_mode == "Fit Summed Trace" else list(df.groupby("Charge"))
 
-        if fit_mode == "Sum first, then fit":
-            target_y = np.sum(list(interpolated.values()), axis=0)
-        else:
-            target_y = np.sum([interpolated[c] for c in charges], axis=0)
+    for group_label, group_df in data_groups:
+        subset = group_df[(group_df["CCS"] >= x_min) & (group_df["CCS"] <= x_max)]
+        x = subset["CCS"].values
+        y = subset["Intensity"].values
+        y = y / y.max()  # Normalize
 
-        target_x = ccs_grid
+        st.markdown(f"### {group_label}")
+        num_peaks = st.number_input(f"Number of Gaussians for {group_label}", min_value=1, max_value=10, value=2, key=f"npeaks_{group_label}")
+        peak_params = []
 
-        st.subheader("Specify Number of Gaussian Peaks")
-        num_peaks = st.number_input("Number of Gaussians", min_value=1, max_value=10, value=2, step=1)
-
-        st.markdown("Enter parameters for each Gaussian (mean, std dev, amplitude):")
-
-        peaks = []
         for i in range(num_peaks):
-            st.markdown(f"**Gaussian {i+1}**")
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                mean = st.text_input(f"Mean {i+1}", value=str(x_min + (i+1)*(x_max - x_min)/(num_peaks + 1)))
-            with col2:
-                std = st.text_input(f"Std Dev {i+1}", value="3.0")
-            with col3:
-                amp = st.text_input(f"Amplitude {i+1}", value=str(np.max(target_y)/2))
+            m = st.text_input(f"Mean of peak {i+1}", value=str(round(x.min() + (i+1)*(x.max()-x.min())/(num_peaks+1), 2)), key=f"mean_{i}_{group_label}")
+            s = st.text_input(f"Std dev of peak {i+1}", value="5.0", key=f"std_{i}_{group_label}")
+            a = st.text_input(f"Amplitude of peak {i+1}", value="1.0", key=f"amp_{i}_{group_label}")
+            peak_params += [float(m), float(s), float(a)]
 
+        autofit = st.button(f"Auto-Fit Gaussians for {group_label}")
+
+        y_fit = sum_of_gaussians(x_fit, *peak_params)
+
+        if autofit:
+            bounds_lower = [p * 0.95 for p in peak_params]
+            bounds_upper = [p * 1.05 for p in peak_params]
             try:
-                peaks.append((float(mean), float(std), float(amp)))
-            except ValueError:
-                st.error(f"Could not parse Gaussian {i+1} parameters. Ensure all values are numeric.")
-                return
+                popt, _ = curve_fit(sum_of_gaussians, x, y, p0=peak_params, bounds=(bounds_lower, bounds_upper))
+                st.success("Optimized fit successful.")
+                y_fit = sum_of_gaussians(x_fit, *popt)
+                st.text("Fitted parameters:\n" + str(np.round(popt, 3)))
+            except Exception as e:
+                st.error(f"Fit failed: {e}")
 
-        # Plotting
-        fig, ax = plt.subplots(figsize=(8, 4))
-        ax.plot(target_x, target_y, label="Original", color="black")
-
-        combined_fit = np.zeros_like(target_x)
-        for i, (mean, std, amp) in enumerate(peaks):
-            gauss = gaussian(target_x, mean, std, amp)
-            combined_fit += gauss
-            ax.plot(target_x, gauss, "--", label=f"Gaussian {i+1}")
-
-        ax.plot(target_x, combined_fit, color="red", linewidth=2, label="Total Fit")
-        ax.set_xlim(x_min, x_max)
+        fig, ax = plt.subplots()
+        ax.plot(x, y, label="Data")
+        ax.plot(x_fit, y_fit, label="Fit", linestyle="--")
+        ax.set_title(f"Gaussian Fit: {group_label}")
         ax.set_xlabel("CCS")
-        ax.set_ylabel("Intensity")
+        ax.set_ylabel("Normalized Intensity")
         ax.legend()
         st.pyplot(fig)
