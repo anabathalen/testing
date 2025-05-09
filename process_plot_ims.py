@@ -47,11 +47,11 @@ def plot_and_scale_page():
 
         st.subheader("Plot Options")
         palette_choice = st.selectbox("Choose a color palette", list(sns.palettes.SEABORN_PALETTES.keys()))
-        fig_width = st.slider("Figure width", min_value=4, max_value=20, value=10)
-        fig_height = st.slider("Figure height", min_value=3, max_value=15, value=6)
+        fig_width = st.slider("Figure width", min_value=2, max_value=20, value=6)
+        fig_height = st.slider("Figure height", min_value=2, max_value=20, value=4)
         fig_dpi = st.slider("Figure DPI", min_value=100, max_value=1000, value=300)
         font_size = st.slider("Font size", min_value=5, max_value=24, value=12)
-        line_thickness = st.slider("Line thickness", min_value=0.5, max_value=5.0, value=1.5, step=0.1)
+        line_thickness = st.slider("Line thickness", min_value=0.1, max_value=5.0, value=1, step=0.1)
         plot_mode = st.radio("Display Mode", ["Summed", "Stacked"])
         use_scaled = st.radio("Use Scaled or Unscaled Intensities?", ["Scaled", "Unscaled"]) == "Scaled"
 
@@ -70,13 +70,14 @@ def plot_and_scale_page():
 
         for i, z in enumerate(selected_charges):
             mz = (protein_mass + z * PROTON_MASS) / z
-            mz_min = mz * 0.99
-            mz_max = mz * 1.01
+            mz_min = mz * 0.98
+            mz_max = mz * 1.02
             region = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]
             ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.5, label=f"{z}+")
 
         ax1.set_xlabel("m/z", fontsize=font_size)
-        ax1.set_ylabel("Intensity", fontsize=font_size)
+        ax1.set_ylabel("")
+        ax1.set_yticks([])
         ax1.set_title("Mass Spectrum with Integration Windows", fontsize=font_size)
         ax1.legend(fontsize=font_size, frameon=False)
 
@@ -131,7 +132,7 @@ def plot_and_scale_page():
                 ax2.plot(ccs_grid, offset_interp, color=palette[i], linewidth=line_thickness)
                 ax2.fill_between(ccs_grid, offset, offset_interp, color=palette[i], alpha=0.3)
 
-                label_x = ccs_grid[0] - (ccs_max_input - ccs_min_input) * 0.01
+                label_x = ccs_grid[0] - (ccs_max_input - ccs_min_input) * 0.1
                 label_y = offset + offset_interp.max() * 0.1
                 ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
                          verticalalignment="bottom", horizontalalignment="left", color=palette[i])
@@ -145,10 +146,8 @@ def plot_and_scale_page():
 
         ax2.set_xlim([ccs_min_input, ccs_max_input])
         ax2.set_xlabel("CCS (Å²)", fontsize=font_size)
-        ax2.set_ylabel("" if plot_mode == "Stacked" else "Intensity", fontsize=font_size)
-        if plot_mode == "Stacked":
-            ax2.set_yticks([])
-        ax2.set_title("Scaled Intensity vs CCS", fontsize=font_size)
+        ax2.set_ylabel("")
+        ax2.set_yticks([])
         ax2.grid(False)
 
         for label in ax2.get_xticklabels():
