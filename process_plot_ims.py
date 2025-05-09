@@ -131,7 +131,7 @@ def plot_and_scale_page():
             for i, charge in enumerate(sorted(interpolated.keys())):
                 interp = interpolated[charge]
                 if not use_scaled:
-                    offset = base_max*1.1
+                    offset = max(interp)*1.1
                 else:
                     offset = i * offset_unit * base_max
                 offset_interp = interp + offset
