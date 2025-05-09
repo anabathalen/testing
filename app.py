@@ -71,5 +71,6 @@ elif page == "Process/Plot IMS":
     plot_and_scale_page()
     
 elif page == "Fit CCS Traces":
+    st.title("Fit CCS Traces")
     fit_ccs_traces_page()
 
