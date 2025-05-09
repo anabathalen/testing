@@ -150,4 +150,3 @@ def fit_ccs_traces_page():
             st.dataframe(results_df)
             csv = results_df.to_csv(index=False)
             download_csv_button(csv, "gaussian_fit_parameters.csv", "Download Fit Parameters CSV")
-
