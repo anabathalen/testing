@@ -131,9 +131,14 @@ def plot_and_scale_page():
             for i, charge in enumerate(sorted(interpolated.keys())):
                 interp = interpolated[charge]
                 if not use_scaled:
-                    offset = max(interp)*1.1
+                    if i == 0:
+                        offset = 0
+                    else:
+                        prev_interp = interpolated[sorted(interpolated.keys())[i - 1]]
+                        offset += prev_interp.max() * 1.1  # stack based on previous max
                 else:
                     offset = i * offset_unit * base_max
+                    
                 offset_interp = interp + offset
 
                 ax2.plot(ccs_grid, offset_interp, color=palette[i], linewidth=line_thickness)
