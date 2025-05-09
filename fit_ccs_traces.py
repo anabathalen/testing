@@ -2,33 +2,45 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.interpolate import interp1d
 from scipy.stats import norm
-from io import StringIO
+from io import BytesIO
+
+PROTON_MASS = 1.007276
+
+def gaussian(x, mu, sigma, amplitude):
+    return amplitude * np.exp(-(x - mu)**2 / (2 * sigma**2))
+
+def generate_gaussian_sum(x, params):
+    return sum(gaussian(x, mu, sigma, amp) for mu, sigma, amp in params)
 
 def fit_ccs_traces_page():
-    st.header("Fit CCS Traces")
+    st.header("Gaussian Fitting of CCS Traces")
 
     cal_file = st.file_uploader("Upload a calibrated CSV file for a protein", type="csv")
     ms_file = st.file_uploader("Upload the mass spectrum TXT file (no headers)", type="txt")
     protein_mass = st.number_input("Enter the protein mass (Da)", min_value=0.0, step=1.0)
 
-    if cal_file and ms_file and protein_mass > 0:
+    x_min = st.number_input("X-axis minimum (CCS)", value=0.0)
+    x_max = st.number_input("X-axis maximum (CCS)", value=3000.0)
+
+    fit_mode = st.radio("Fit mode", ["Fit individual charge states before summing", "Fit the summed trace"])
+
+    if cal_file and ms_file and protein_mass > 0 and x_max > x_min:
         cal_df = pd.read_csv(cal_file)
         if not {'Charge', 'CCS', 'CCS Std.Dev.', 'Intensity'}.issubset(cal_df.columns):
-            st.error("CSV must contain 'Charge', 'CCS', 'CCS Std.Dev.', and 'Intensity'.")
+            st.error("CSV file must contain 'Charge', 'CCS', 'CCS Std.Dev.', and 'Intensity'.")
             return
 
         cal_df = cal_df[cal_df['CCS Std.Dev.'] < 0.5 * cal_df['CCS']].copy()
         ms_df = pd.read_csv(ms_file, sep="\t", header=None, names=["m/z", "Intensity"])
         ms_df.dropna(inplace=True)
 
-        PROTON_MASS = 1.007276
         all_charges = sorted(cal_df["Charge"].unique())
         selected_charges = st.multiselect("Select charge states to include", all_charges, default=all_charges)
+
         cal_df = cal_df[cal_df["Charge"].isin(selected_charges)]
 
-        # Scaling logic
+        # Calculate scale factors
         scale_factors = {}
         for z in selected_charges:
             mz = (protein_mass + z * PROTON_MASS) / z
@@ -40,71 +52,93 @@ def fit_ccs_traces_page():
         cal_df["Scale Factor"] = cal_df["Charge"].map(scale_factors)
         cal_df["Scaled Intensity"] = cal_df["Intensity"] * cal_df["Scale Factor"]
 
-        # Fit mode
-        fit_mode = st.radio("Fit mode", ["Sum trace then fit", "Fit each charge then sum"])
+        x_fit = np.linspace(x_min, x_max, 1000)
 
-        all_traces = []
-        gaussian_params = []
-        common_ccs = np.linspace(cal_df["CCS"].min(), cal_df["CCS"].max(), 1000)
+        output_dfs = []
+        output_labels = []
 
-        fig, ax = plt.subplots()
-        ax.set_title("CCS Traces and Gaussian Fits")
-        ax.set_xlabel("CCS")
-        ax.set_ylabel("Scaled Intensity")
+        if fit_mode == "Fit individual charge states before summing":
+            summed_trace = np.zeros_like(x_fit)
 
-        for z in selected_charges:
-            sub = cal_df[cal_df["Charge"] == z]
-            if sub.empty:
-                continue
-            interp_func = interp1d(sub["CCS"], sub["Scaled Intensity"], bounds_error=False, fill_value=0)
-            y_interp = interp_func(common_ccs)
-            all_traces.append(y_interp)
-
-            if fit_mode == "Fit each charge then sum":
-                st.subheader(f"Charge {z} Gaussian Fit")
-                num_peaks = st.slider(f"Number of Gaussians for charge {z}", 1, 5, 1)
-                y_fit = np.zeros_like(common_ccs)
-                for i in range(num_peaks):
-                    mean = st.slider(f"Mean {i+1} (z={z})", float(common_ccs.min()), float(common_ccs.max()), float(sub["CCS"].mean()))
-                    std = st.slider(f"Std. Dev. {i+1} (z={z})", 1.0, 30.0, 10.0)
-                    amp = st.slider(f"Amplitude {i+1} (z={z})", 0.0, float(y_interp.max()) * 2, float(y_interp.max()))
-                    y_fit += amp * norm.pdf(common_ccs, mean, std)
-                    gaussian_params.append({"Charge": z, "Peak": i+1, "Mean": mean, "StdDev": std, "Amplitude": amp})
-                ax.plot(common_ccs, y_interp, label=f"Raw z={z}", alpha=0.3)
-                ax.plot(common_ccs, y_fit, label=f"Fit z={z}", linestyle="--")
-
-        if fit_mode == "Sum trace then fit":
-            summed_trace = np.sum(all_traces, axis=0)
-            st.subheader("Summed Gaussian Fit")
-            num_peaks = st.slider("Number of Gaussians for summed trace", 1, 5, 1)
-            y_fit = np.zeros_like(common_ccs)
-            for i in range(num_peaks):
-                mean = st.slider(f"Mean {i+1}", float(common_ccs.min()), float(common_ccs.max()), float(common_ccs.mean()))
-                std = st.slider(f"Std. Dev. {i+1}", 1.0, 30.0, 10.0)
-                amp = st.slider(f"Amplitude {i+1}", 0.0, float(summed_trace.max()) * 2, float(summed_trace.max()))
-                y_fit += amp * norm.pdf(common_ccs, mean, std)
-                gaussian_params.append({"Charge": "summed", "Peak": i+1, "Mean": mean, "StdDev": std, "Amplitude": amp})
-            ax.plot(common_ccs, summed_trace, label="Summed Trace", alpha=0.3)
-            ax.plot(common_ccs, y_fit, label="Summed Fit", linestyle="-")
-
-        ax.legend()
-        st.pyplot(fig)
-
-        # Download CSVs
-        if gaussian_params:
-            params_df = pd.DataFrame(gaussian_params)
-            csv_gauss = params_df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download Gaussian Parameters CSV", csv_gauss, "gaussian_parameters.csv", "text/csv")
-
-        if fit_mode == "Sum trace then fit":
-            trace_df = pd.DataFrame({"CCS": common_ccs, "Summed Intensity": y_fit})
-            csv_trace = trace_df.to_csv(index=False).encode("utf-8")
-            st.download_button("Download Summed Fitted Trace CSV", csv_trace, "summed_fitted_trace.csv", "text/csv")
-        else:
             for z in selected_charges:
-                trace_df = pd.DataFrame({"CCS": common_ccs})
-                trace_df[f"Charge {z}"] = interp1d(cal_df[cal_df["Charge"] == z]["CCS"],
-                                                   cal_df[cal_df["Charge"] == z]["Scaled Intensity"],
-                                                   bounds_error=False, fill_value=0)(common_ccs)
-                csv_trace = trace_df.to_csv(index=False).encode("utf-8")
-                st.download_button(f"Download Fitted Trace CSV for Charge {z}", csv_trace, f"fitted_trace_charge_{z}.csv", "text/csv")
+                st.subheader(f"Charge State {z}")
+                n_peaks = st.number_input(f"Number of Gaussians for {z}", min_value=1, max_value=5, value=1, key=f"peaks_{z}")
+                params = []
+                for i in range(n_peaks):
+                    mu = st.text_input(f"Mean of Gaussian {i+1} (z={z})", value="1000", key=f"mu_{z}_{i}")
+                    sigma = st.text_input(f"Sigma of Gaussian {i+1} (z={z})", value="20", key=f"sigma_{z}_{i}")
+                    amp = st.text_input(f"Amplitude of Gaussian {i+1} (z={z})", value="1", key=f"amp_{z}_{i}")
+                    try:
+                        params.append((float(mu), float(sigma), float(amp)))
+                    except ValueError:
+                        st.warning("Invalid parameter input. Using default.")
+                        params.append((1000, 20, 1))
+
+                y_fit = generate_gaussian_sum(x_fit, params)
+                summed_trace += y_fit
+
+                df = pd.DataFrame({"CCS": x_fit, f"Fitted Intensity z={z}": y_fit})
+                output_dfs.append(df)
+                output_labels.append(f"fit_z{z}.csv")
+
+                fig, ax = plt.subplots()
+                ax.plot(x_fit, y_fit, label=f"Charge {z} Fit")
+                ax.set_xlim(x_min, x_max)
+                ax.set_title(f"Gaussian Fit for Charge State {z}")
+                ax.set_xlabel("CCS")
+                ax.set_ylabel("Fitted Intensity")
+                st.pyplot(fig)
+
+            # Show summed trace
+            fig2, ax2 = plt.subplots()
+            ax2.plot(x_fit, summed_trace, label="Summed Fit")
+            ax2.set_xlim(x_min, x_max)
+            ax2.set_title("Summed Gaussian Fit")
+            ax2.set_xlabel("CCS")
+            ax2.set_ylabel("Fitted Intensity")
+            st.pyplot(fig2)
+
+            df_sum = pd.DataFrame({"CCS": x_fit, "Summed Fitted Intensity": summed_trace})
+            output_dfs.append(df_sum)
+            output_labels.append("summed_fit.csv")
+
+        else:
+            st.subheader("Summed Trace Fit")
+            trace = np.zeros_like(x_fit)
+            for z in selected_charges:
+                sub_df = cal_df[cal_df['Charge'] == z]
+                trace_z = np.interp(x_fit, sub_df['CCS'], sub_df['Scaled Intensity'], left=0, right=0)
+                trace += trace_z
+
+            n_peaks = st.number_input("Number of Gaussians for summed fit", min_value=1, max_value=5, value=1, key="summed")
+            params = []
+            for i in range(n_peaks):
+                mu = st.text_input(f"Mean of Gaussian {i+1} (summed)", value="1000", key=f"mu_sum_{i}")
+                sigma = st.text_input(f"Sigma of Gaussian {i+1} (summed)", value="20", key=f"sigma_sum_{i}")
+                amp = st.text_input(f"Amplitude of Gaussian {i+1} (summed)", value="1", key=f"amp_sum_{i}")
+                try:
+                    params.append((float(mu), float(sigma), float(amp)))
+                except ValueError:
+                    st.warning("Invalid parameter input. Using default.")
+                    params.append((1000, 20, 1))
+
+            y_fit = generate_gaussian_sum(x_fit, params)
+
+            fig, ax = plt.subplots()
+            ax.plot(x_fit, trace, label="Observed", linestyle=":")
+            ax.plot(x_fit, y_fit, label="Fitted", linestyle="--")
+            ax.set_xlim(x_min, x_max)
+            ax.set_title("Summed Gaussian Fit")
+            ax.set_xlabel("CCS")
+            ax.set_ylabel("Intensity")
+            ax.legend()
+            st.pyplot(fig)
+
+            df = pd.DataFrame({"CCS": x_fit, "Observed": trace, "Fitted": y_fit})
+            output_dfs.append(df)
+            output_labels.append("summed_fit.csv")
+
+        for df, label in zip(output_dfs, output_labels):
+            csv = df.to_csv(index=False).encode("utf-8")
+            st.download_button(f"Download {label}", data=csv, file_name=label, mime="text/csv")
+
