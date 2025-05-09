@@ -31,8 +31,8 @@ def plot_and_scale_page():
         scale_factors = {}
         for z in selected_charges:
             mz = (protein_mass + z * PROTON_MASS) / z
-            mz_min = mz * 0.99
-            mz_max = mz * 1.01
+            mz_min = mz * 0.98
+            mz_max = mz * 1.02
             intensity_sum = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]["Intensity"].sum()
             scale_factors[z] = intensity_sum
 
