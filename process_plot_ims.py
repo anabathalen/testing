@@ -130,7 +130,10 @@ def plot_and_scale_page():
 
             for i, charge in enumerate(sorted(interpolated.keys())):
                 interp = interpolated[charge]
-                offset = i * offset_unit * base_max
+                if not use_scaled:
+                    offset = base_max*1.1
+                else:
+                    offset = i * offset_unit * base_max
                 offset_interp = interp + offset
 
                 ax2.plot(ccs_grid, offset_interp, color=palette[i], linewidth=line_thickness)
@@ -138,7 +141,7 @@ def plot_and_scale_page():
 
                 # Label slightly to right of min CCS, slightly above the line
                 label_x = ccs_min_input + (ccs_max_input - ccs_min_input) * 0.1
-                label_y = offset + base_max * 0.1
+                label_y = offset + base_max * 0.05
                 ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
                          verticalalignment="bottom", horizontalalignment="left", color=palette[i])
 
