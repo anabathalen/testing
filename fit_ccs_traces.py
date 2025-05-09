@@ -48,49 +48,71 @@ def fit_ccs_traces_page():
     if fit_mode == "Fit Summed Trace":
         all_traces = []
 
+    # Create the scale factors dictionary
+    scale_factors = {}
+
     for group_label, group_df in data_groups:
         subset = group_df[(group_df["CCS"] >= x_min) & (group_df["CCS"] <= x_max)]
         x = subset["CCS"].values
         y = subset["Intensity"].values
         y = y / y.max()  # Normalize
 
-        st.markdown(f"### {group_label}")
-        num_peaks = st.number_input(f"Number of Gaussians for {group_label}", min_value=1, max_value=10, value=2, key=f"npeaks_{group_label}")
-        peak_params = []
+        if fit_mode == "Fit Each Charge Separately":
+            charge = group_label
+            PROTON_MASS = 1.007276
+            protein_mass = st.number_input("Enter Protein Mass (Da)", min_value=0.0, step=0.1, value=10000.0)
 
-        for i in range(num_peaks):
-            m = st.text_input(f"Mean of peak {i+1}", value=str(round(x.min() + (i+1)*(x.max()-x.min())/(num_peaks+1), 2)), key=f"mean_{i}_{group_label}")
-            s = st.text_input(f"Std dev of peak {i+1}", value="5.0", key=f"std_{i}_{group_label}")
-            a = st.text_input(f"Amplitude of peak {i+1}", value="1.0", key=f"amp_{i}_{group_label}")
-            peak_params += [float(m), float(s), float(a)]
+            mz = (protein_mass + charge * PROTON_MASS) / charge
+            mz_min = mz * 0.98
+            mz_max = mz * 1.02
 
-        autofit = st.button(f"Auto-Fit Gaussians for {group_label}")
+            # Assuming you have a separate MS data file (here we're simulating it)
+            ms_df = pd.read_csv("ms_data.csv", sep="\t", header=None, names=["m/z", "Intensity"])
+            ms_df.dropna(inplace=True)
+            intensity_sum = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]["Intensity"].sum()
+            scale_factors[charge] = intensity_sum
 
-        y_fit = sum_of_gaussians(x_fit, *peak_params)
+            # Apply the scaling factor
+            scale_factor = scale_factors[charge]
+            y_scaled = y * scale_factor
 
-        if autofit:
-            bounds_lower = [p * 0.95 for p in peak_params]
-            bounds_upper = [p * 1.05 for p in peak_params]
-            try:
-                popt, _ = curve_fit(sum_of_gaussians, x, y, p0=peak_params, bounds=(bounds_lower, bounds_upper))
-                st.success("Optimized fit successful.")
-                y_fit = sum_of_gaussians(x_fit, *popt)
-                st.text("Fitted parameters:\n" + str(np.round(popt, 3)))
-                gaussian_fit_params.append(popt)
-            except Exception as e:
-                st.error(f"Fit failed: {e}")
+            st.markdown(f"### Charge {charge} (Scaled)")
+            num_peaks = st.number_input(f"Number of Gaussians for Charge {charge}", min_value=1, max_value=10, value=2, key=f"npeaks_{charge}")
+            peak_params = []
 
-        fig, ax = plt.subplots()
-        ax.plot(x, y, label="Data")
-        ax.plot(x_fit, y_fit, label="Fit", linestyle="--")
-        ax.set_title(f"Gaussian Fit: {group_label}")
-        ax.set_xlabel("CCS")
-        ax.set_ylabel("Normalized Intensity")
-        ax.legend()
-        st.pyplot(fig)
+            for i in range(num_peaks):
+                m = st.text_input(f"Mean of peak {i+1} for Charge {charge}", value=str(round(x.min() + (i+1)*(x.max()-x.min())/(num_peaks+1), 2)), key=f"mean_{i}_{charge}")
+                s = st.text_input(f"Std dev of peak {i+1} for Charge {charge}", value="5.0", key=f"std_{i}_{charge}")
+                a = st.text_input(f"Amplitude of peak {i+1} for Charge {charge}", value="1.0", key=f"amp_{i}_{charge}")
+                peak_params += [float(m), float(s), float(a)]
 
-        if fit_mode == "Fit Summed Trace":
-            all_traces.append(y_fit)
+            autofit = st.button(f"Auto-Fit Gaussians for Charge {charge}")
+
+            y_fit = sum_of_gaussians(x_fit, *peak_params)
+
+            if autofit:
+                bounds_lower = [p * 0.95 for p in peak_params]
+                bounds_upper = [p * 1.05 for p in peak_params]
+                try:
+                    popt, _ = curve_fit(sum_of_gaussians, x, y_scaled, p0=peak_params, bounds=(bounds_lower, bounds_upper))
+                    st.success("Optimized fit successful.")
+                    y_fit = sum_of_gaussians(x_fit, *popt)
+                    st.text("Fitted parameters:\n" + str(np.round(popt, 3)))
+                    gaussian_fit_params.append(popt)
+                except Exception as e:
+                    st.error(f"Fit failed: {e}")
+
+            fig, ax = plt.subplots()
+            ax.plot(x, y_scaled, label="Scaled Data")
+            ax.plot(x_fit, y_fit, label="Fit", linestyle="--")
+            ax.set_title(f"Gaussian Fit: Charge {charge}")
+            ax.set_xlabel("CCS")
+            ax.set_ylabel("Scaled Intensity")
+            ax.legend()
+            st.pyplot(fig)
+
+            if fit_mode == "Fit Summed Trace":
+                all_traces.append(y_fit)
 
     if fit_mode == "Fit Summed Trace":
         summed_trace = np.sum(all_traces, axis=0)
@@ -114,4 +136,5 @@ def fit_ccs_traces_page():
                                               [f"Amplitude_{i+1}" for i in range(num_peaks)])
     gaussian_params_csv = gaussian_params_df.to_csv(index=False).encode("utf-8")
     st.download_button("Download Gaussian Fit Parameters", data=gaussian_params_csv, file_name="gaussian_fit_parameters.csv", mime="text/csv", key="gaussian_fit_params")
+
 
