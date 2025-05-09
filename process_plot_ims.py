@@ -111,33 +111,38 @@ def plot_and_scale_page():
 
         elif plot_mode == "Stacked":
             offset_unit = 1.0 / len(selected_charges)
+
+            # First, determine base max intensity to control Y offset and label height
             base_max = 0
+            interpolated = {}
 
-            # Calculate base max intensity
-            for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
-                y_values = group["Scaled Intensity"] if use_scaled else group["Intensity"]
-                base_max = max(base_max, y_values.max())
-
-            for i, (charge, group) in enumerate(cal_df.groupby("Charge")):
+            for charge, group in cal_df.groupby("Charge"):
                 group_sorted = group.sort_values("CCS")
                 y_values = group_sorted["Scaled Intensity"] if use_scaled else group_sorted["Intensity"]
                 interp = np.interp(ccs_grid, group_sorted["CCS"], y_values, left=0, right=0)
 
-                if not use_scaled:
-                    interp = interp / interp.max() if interp.max() > 0 else interp
+                # Only normalize if using unscaled data
+                if not use_scaled and interp.max() > 0:
+                    interp = interp / interp.max()
 
+                interpolated[charge] = interp
+                base_max = max(base_max, interp.max())
+
+            for i, charge in enumerate(sorted(interpolated.keys())):
+                interp = interpolated[charge]
                 offset = i * offset_unit * base_max
                 offset_interp = interp + offset
 
                 ax2.plot(ccs_grid, offset_interp, color=palette[i], linewidth=line_thickness)
                 ax2.fill_between(ccs_grid, offset, offset_interp, color=palette[i], alpha=0.3)
 
+                # Label slightly to right of min CCS, slightly above the line
                 label_x = ccs_min_input + (ccs_max_input - ccs_min_input) * 0.1
-                label_y = offset + offset_interp.max() * 0.1
+                label_y = offset + base_max * 0.1
                 ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
                          verticalalignment="bottom", horizontalalignment="left", color=palette[i])
 
-            max_y_value = (len(selected_charges)) * offset_unit * base_max
+            max_y_value = len(selected_charges) * offset_unit * base_max
 
         if ccs_label_value > 0:
             ax2.axvline(ccs_label_value, color="black", linewidth=1.0, linestyle="--")
