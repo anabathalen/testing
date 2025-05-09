@@ -145,7 +145,7 @@ def plot_and_scale_page():
                 ax2.fill_between(ccs_grid, offset, offset_interp, color=palette[i], alpha=0.3)
 
                 # Label slightly to right of min CCS, slightly above the line
-                label_x = ccs_min_input + (ccs_max_input - ccs_min_input) * 0.1
+                label_x = ccs_min_input + (ccs_max_input - ccs_min_input) * 0.05
                 label_y = offset + base_max * 0.05
                 ax2.text(label_x, label_y, f"{int(charge)}+", fontsize=font_size,
                          verticalalignment="bottom", horizontalalignment="left", color=palette[i])
