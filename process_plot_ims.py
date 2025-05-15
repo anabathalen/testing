@@ -70,8 +70,8 @@ def plot_and_scale_page():
 
         for i, z in enumerate(selected_charges):
             mz = (protein_mass + z * PROTON_MASS) / z
-            mz_min = mz * 0.98
-            mz_max = mz * 1.02
+            mz_min = mz * 0.995
+            mz_max = mz * 1.005
             region = ms_df[(ms_df["m/z"] >= mz_min) & (ms_df["m/z"] <= mz_max)]
             ax1.fill_between(region["m/z"], region["Intensity"], color=palette[i], alpha=0.5, label=f"{z}+")
 
