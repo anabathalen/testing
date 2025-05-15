@@ -154,8 +154,6 @@ def plot_and_scale_page():
 
         if ccs_label_value > 0:
             ax2.axvline(ccs_label_value, color="black", linewidth=1.0, linestyle="--")
-            ax2.text(ccs_label_value - 0.5, max_y_value * 0.95, "txt", color="black", fontsize=font_size,
-                     horizontalalignment="right", verticalalignment="top")
 
         ax2.set_xlim([ccs_min_input, ccs_max_input])
         ax2.set_xlabel("CCS (Å²)", fontsize=font_size)
