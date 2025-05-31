@@ -45,7 +45,7 @@ def twim_extract_page():
             return
 
         data_type = st.radio("Is your data from a Synapt or Cyclic instrument?", ["Synapt", "Cyclic"])
-        charge_state = st.number_input("Enter the charge state of the protein (Z)", min_value=1, max_value=10, step=1)
+        charge_state = st.number_input("Enter the charge state of the protein (Z)", min_value=1, max_value=100, step=1)
         inject_time = None
 
         if data_type == "Cyclic":
